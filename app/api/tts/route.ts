@@ -296,10 +296,7 @@ export async function POST(req: NextRequest) {
       }
 
       // MP3 con pausas - generar como WAV, concatenar, y devolver como WAV (no se puede MP3 con pausas fácilmente)
-      // Para MP3 con pausas, informamos al usuario que use WAV
       if (fmt === "mp3" && hasPauses) {
-        // Generar cada segmento y concatenar como WAV, luego devolver como WAV
-        // (No podemos concatenar MP3s fácilmente sin ffmpeg)
         const audioChunks: Int16Array[] = []
         const sampleRate = 8000
 
@@ -414,13 +411,10 @@ export async function POST(req: NextRequest) {
       const voiceId = VOICES[voice]
 
       // 🔹 Language: SOLO lo enviamos para voces en español/mexicano.
-      // Para euskera/gallego lo omitimos porque puede causar 400 en Cartesia.
       let language: string | undefined = undefined
       if (voice === "chica" || voice === "chico" || voice === "mexicano") {
         language = "es"
       }
-      // euskera_chico / euskera_chica -> SIN language (voice ya sabe idioma)
-      // gallego_chico / gallego_chica -> SIN language
 
       // Helper para generar audio de un texto con Cartesia
       async function generateCartesiaAudio(inputText: string): Promise<Int16Array> {
@@ -439,7 +433,7 @@ export async function POST(req: NextRequest) {
         const res = await fetch("https://api.cartesia.ai/tts/bytes", {
           method: "POST",
           headers: {
-            "X-API-Key": cartesiaKey,
+            "X-API-Key": cartesiaKey || "", // <<< AQUÍ ESTÁ EL CAMBIO
             "Cartesia-Version": "2024-11-13",
             "Content-Type": "application/json",
           },
@@ -454,7 +448,7 @@ export async function POST(req: NextRequest) {
         const raw = new Uint8Array(await res.arrayBuffer())
         const int16_24k = new Int16Array(raw.buffer, raw.byteOffset, Math.floor(raw.byteLength / 2))
         
-        // Downsample de 24k a 8k (tomar 1 de cada 3)
+        // Downsample de 24k a 8k
         const int16_8k = new Int16Array(Math.floor(int16_24k.length / 3))
         for (let i = 0, j = 0; i < int16_24k.length; i += 3) int16_8k[j++] = int16_24k[i]
         
@@ -478,7 +472,7 @@ export async function POST(req: NextRequest) {
         const resTts = await fetch("https://api.cartesia.ai/tts/bytes", {
           method: "POST",
           headers: {
-            "X-API-Key": cartesiaKey,
+            "X-API-Key": cartesiaKey || "", // <<< AQUÍ ESTÁ EL CAMBIO
             "Cartesia-Version": "2024-11-13",
             "Content-Type": "application/json",
           },
@@ -509,7 +503,7 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // MP3 con pausas o WAV - generar segmentos y concatenar
+      // MP3 con pausas o WAV
       const audioChunks: Int16Array[] = []
       const sampleRate = 8000
 
