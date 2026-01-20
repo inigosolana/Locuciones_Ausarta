@@ -1,12 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  images: {
-    unoptimized: true,
-  },
- 
-}
-
-export default nextConfig
+    // Esto es VITAL: obliga a Next.js a incluir el ejecutable de ffmpeg en el servidor
+    experimental: {
+      serverComponentsExternalPackages: ['ffmpeg-static'],
+    },
+  };
+  
+  export default nextConfig;

@@ -5,56 +5,51 @@ import os from "node:os"
 import path from "node:path"
 import ffmpegStatic from "ffmpeg-static"
 
-// Configuración para Vercel/Next.js
-export const runtime = "nodejs" // Necesario para ejecutar binarios
+// Configuración para Vercel (Serverless)
+export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
 async function resolveFfmpegPath(): Promise<string> {
-  // 1) Intentar usar la variable de entorno FFMPEG_PATH si existe
+  // 1. Intentar usar variable de entorno (pero SIN romper si falla)
   const fromEnv = process.env.FFMPEG_PATH
   if (fromEnv) {
     try {
       await access(fromEnv)
-      // Si llegamos aquí, el archivo existe
-      try { await chmod(fromEnv, 0o755) } catch {}
+      try { await chmod(fromEnv, 0o755) } catch {} // Dar permisos si es posible
       console.log(`[ffmpeg] Usando binario desde ENV: ${fromEnv}`)
       return fromEnv
     } catch (e) {
-      // Si falla, solo avisamos y seguimos con el fallback
-      console.warn(`[ffmpeg] FFMPEG_PATH estaba definido (${fromEnv}) pero no es accesible. Intentando fallback...`)
+      console.warn(`[ffmpeg] FFMPEG_PATH definido (${fromEnv}) pero no accesible. Usando fallback...`)
     }
   }
 
-  // 2) Fallback: usar la ruta que nos da la librería ffmpeg-static
+  // 2. Fallback: Usar el binario interno de ffmpeg-static
   const fromStatic = (ffmpegStatic as unknown as string) || ""
   if (!fromStatic) {
-    throw new Error("No se pudo resolver la ruta de FFmpeg. Asegúrate de tener 'ffmpeg-static' instalado.")
+    throw new Error("No se pudo encontrar la ruta de FFmpeg. Revisa next.config.mjs")
   }
 
-  // Verificar que el binario de la librería exista realmente
-  await access(fromStatic).catch(() => {
-    throw new Error(
-      `El binario de ffmpeg-static no se encuentra en: ${fromStatic}. \n` +
-      `Si estás en Vercel, asegúrate de añadir 'ffmpeg-static' a 'serverComponentsExternalPackages' en next.config.mjs`
-    )
-  })
+  // Comprobar que existe de verdad
+  try {
+    await access(fromStatic)
+    try { await chmod(fromStatic, 0o755) } catch {}
+  } catch (e) {
+    throw new Error(`El binario de ffmpeg-static no aparece en: ${fromStatic}. \nIMPORTANTE: Asegúrate de haber creado el archivo next.config.mjs con 'serverComponentsExternalPackages'`)
+  }
 
-  try { await chmod(fromStatic, 0o755) } catch {}
   return fromStatic
 }
 
-// Función auxiliar para ejecutar comandos de consola (FFmpeg)
 function run(cmd: string, args: string[], timeoutMs = 45000): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     const child = spawn(cmd, args)
     let stdout = ""
     let stderr = ""
 
-    // Timeout de seguridad
     const timer = setTimeout(() => {
       child.kill()
-      resolve({ code: -1, stdout, stderr: stderr + "\n[Timeout process killed]" })
+      resolve({ code: -1, stdout, stderr: stderr + "\n[Timeout killed]" })
     }, timeoutMs)
 
     child.stdout.on("data", (d) => { stdout += d.toString() })
@@ -67,7 +62,7 @@ function run(cmd: string, args: string[], timeoutMs = 45000): Promise<{ code: nu
 
     child.on("error", (err) => {
       clearTimeout(timer)
-      resolve({ code: -1, stdout, stderr: stderr + `\n[Spawn Error: ${err.message}]` })
+      resolve({ code: -1, stdout, stderr: stderr + `\n[Error spawn: ${err.message}]` })
     })
   })
 }
@@ -77,64 +72,55 @@ export async function POST(req: Request) {
   let tmpOut = ""
 
   try {
-    // 1. Obtener el archivo del FormData
     const formData = await req.formData()
     const file = formData.get("audio") as File | null
     const baseName = (formData.get("baseName") as string) || "audio_converted"
 
-    if (!file || typeof file.arrayBuffer !== "function") {
-      return NextResponse.json({ error: "No se recibió ningún archivo de audio válido" }, { status: 400 })
+    if (!file) {
+      return NextResponse.json({ error: "No se recibió archivo" }, { status: 400 })
     }
 
-    // 2. Resolver ruta de FFmpeg (con reintento robusto)
+    // AQUI OCURRE LA MAGIA: Buscamos ffmpeg de forma segura
     const ff = await resolveFfmpegPath()
 
-    // 3. Guardar archivo temporalmente
     const arrayBuf = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuf)
-    if (buffer.length === 0) {
-      return NextResponse.json({ error: "El archivo está vacío (0 bytes)" }, { status: 400 })
-    }
-
-    // Identificar extensión o usar .bin por defecto
-    const originalName = file.name || ""
-    const ext = path.extname(originalName).replace(".", "") || "bin"
-
+    
+    // Rutas temporales
+    const ext = file.name ? path.extname(file.name).replace(".", "") : "bin"
     tmpIn = path.join(os.tmpdir(), `in_${Date.now()}.${ext}`)
     tmpOut = path.join(os.tmpdir(), `out_${Date.now()}.wav`)
 
     await writeFile(tmpIn, buffer)
 
-    // 4. Ejecutar conversión
-    // 1º intento: conversión estándar
-    // Parámetros para Yeastar/3CX: 8kHz, Mono, 16-bit PCM (pcm_s16le)
-    let conv = await run(
-      ff,
-      ["-y", "-i", tmpIn, "-vn", "-ar", "8000", "-ac", "1", "-acodec", "pcm_s16le", tmpOut],
-      50000
-    )
+    // Conversión (Yeastar compatible: 8kHz, Mono, 16bit)
+    // 1. Intento normal
+    let result = await run(ff, [
+      "-y", "-i", tmpIn, 
+      "-vn", // sin video
+      "-ar", "8000", "-ac", "1", "-acodec", "pcm_s16le", 
+      tmpOut
+    ])
 
-    // Si falló (ej: archivo WhatsApp con metadata compleja), 2º intento mapeando stream de audio
-    if (conv.code !== 0) {
-      console.log("Primer intento fallido, reintentando con mapeo explícito...", conv.stderr)
-      conv = await run(
-        ff,
-        ["-y", "-i", tmpIn, "-vn", "-map", "0:a:0?", "-ar", "8000", "-ac", "1", "-acodec", "pcm_s16le", tmpOut],
-        50000
-      )
-      if (conv.code !== 0) {
-        throw new Error(`FFmpeg error:\n${conv.stderr || "Error desconocido al convertir"}`)
+    // 2. Si falla, intentar mapeo forzado (para audios raros de WhatsApp/Opus)
+    if (result.code !== 0) {
+      console.log("Reintentando conversión con mapeo...", result.stderr)
+      result = await run(ff, [
+        "-y", "-i", tmpIn, 
+        "-vn", "-map", "0:a:0?", // fuerza primer canal de audio
+        "-ar", "8000", "-ac", "1", "-acodec", "pcm_s16le", 
+        tmpOut
+      ])
+      
+      if (result.code !== 0) {
+        throw new Error(`Error FFmpeg: ${result.stderr}`)
       }
     }
 
-    // 5. Leer el resultado y devolverlo
     const wavBuffer = await readFile(tmpOut)
-    
+
     // Limpieza
-    await Promise.all([
-        unlink(tmpIn).catch(() => {}), 
-        unlink(tmpOut).catch(() => {})
-    ])
+    await Promise.all([unlink(tmpIn).catch(()=>{}), unlink(tmpOut).catch(()=>{} )])
 
     return new NextResponse(wavBuffer, {
       headers: {
@@ -146,12 +132,11 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error("[Converter Error]", error)
-    // Intentar limpiar ficheros en caso de error
     if (tmpIn) await unlink(tmpIn).catch(() => {})
     if (tmpOut) await unlink(tmpOut).catch(() => {})
-
+    
     return NextResponse.json(
-      { error: error.message || "Error interno del servidor al convertir" },
+      { error: error.message || "Error al convertir" },
       { status: 500 }
     )
   }
