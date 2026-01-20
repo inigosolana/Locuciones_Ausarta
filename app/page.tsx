@@ -401,7 +401,7 @@ export default function Page() {
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105"
             }`}
           >
-            🔄 Convertidor
+            🔄 Convertidor a WAV YEASTAR/3CX
           </button>
           <button
             onClick={() => setMode("merge")}
@@ -421,7 +421,7 @@ export default function Page() {
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105"
             }`}
           >
-            ⏰ IA Mensajes
+            ⏰ IA Generador Locucion
           </button>
         </div>
 
