@@ -1,9 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // Esto es VITAL: obliga a Next.js a incluir el ejecutable de ffmpeg en el servidor
-    experimental: {
-      serverComponentsExternalPackages: ['ffmpeg-static'],
-    },
-  };
+  // En Next.js 15/16, esto va FUERA de 'experimental' y se llama 'serverExternalPackages'
+  serverExternalPackages: ['ffmpeg-static', '@ffmpeg-installer/ffmpeg'],
   
-  export default nextConfig;
+  // (Opcional) Mantener compatibilidad si usas una versión < 15 en algún entorno
+  experimental: {
+    serverComponentsExternalPackages: ['ffmpeg-static', '@ffmpeg-installer/ffmpeg'],
+  },
+};
+
+export default nextConfig;
