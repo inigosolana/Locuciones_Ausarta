@@ -1198,6 +1198,7 @@ export default function Page() {
                     </div>
                   )}
 
+                  {/* Bloque de botones para pasar a TTS con nombre automático */}
                   <div className={`grid gap-3 ${schedVoicemailText ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"}`}>
                     <button
                       onClick={() => {
@@ -1205,6 +1206,10 @@ export default function Page() {
                           setSchedError("El texto de dentro de horario está vacío")
                           return
                         }
+                        // 🔹 AQUI ESTÁ EL CAMBIO: Generar nombre empresa_DH
+                        const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
+                        setFilename(`${safeName}_DH`)
+
                         setText(schedInsideText)
                         setMode("tts")
                       }}
@@ -1218,6 +1223,10 @@ export default function Page() {
                           setSchedError("El texto de fuera de horario está vacío")
                           return
                         }
+                        // 🔹 AQUI ESTÁ EL CAMBIO: Generar nombre empresa_FH
+                        const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
+                        setFilename(`${safeName}_FH`)
+
                         setText(schedOutsideText)
                         setMode("tts")
                       }}
@@ -1232,6 +1241,10 @@ export default function Page() {
                             setSchedError("El texto de buzón está vacío")
                             return
                           }
+                          // 🔹 AQUI ESTÁ EL CAMBIO: Generar nombre empresa_BV
+                          const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
+                          setFilename(`${safeName}_BV`)
+
                           setText(schedVoicemailText)
                           setMode("tts")
                         }}

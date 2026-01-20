@@ -116,22 +116,29 @@ Horario: ${scheduleText}
 
 Genera un JSON válido con las claves: ${jsonKeys}.
 
+REGLAS DE FORMATO OBLIGATORIAS:
+1. Escribe TODOS los números en letra (ej: "pulse uno" en vez de "pulse 1").
+2. Escribe TODAS las horas en letra y en formato natural hablado, indicando momento del día:
+   - "14:00" -> "las dos de la tarde"
+   - "20:00" -> "las ocho de la tarde"
+   - "09:00" -> "las nueve de la mañana"
+   - "13:30" -> "la una y media de la tarde"
+3. NO uses dígitos (0-9) ni formato 24h (14:00) en el texto generado. Todo debe estar escrito tal cual se debe pronunciar.
+
 messageInside (empresa ABIERTA - Máx 25 segundos):
 ${insideInstructions}
 - Tono profesional, claro y pausado
-- Las opciones deben ser naturales y fáciles de entender
-- Ejemplo formato: "Pulse 1 para hablar con Atención al Cliente. Pulse 2 para Reclamaciones."
+- Las opciones deben ser naturales. Ejemplo: "Pulse uno para hablar con Atención al Cliente."
 
 messageOutside (empresa CERRADA - Máx 20 segundos):
 - Saludo breve y profesional
 - Disculparse por estar cerrado
-- Informar horario exacto: ${scheduleText}
+- Informar horario exacto siguiendo las REGLAS DE FORMATO (horas en letra).
 - Sugerir llamar durante horario de atención
 - Agradecer por llamar
 - NO mencionar buzón de voz${voicemailInstructions}
 
 Responde SOLO con JSON válido, sin markdown ni explicaciones.`;
-
     // Llamada a OpenAI
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
