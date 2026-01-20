@@ -6,10 +6,8 @@ import { useRef, useState, useCallback, type ChangeEvent } from "react"
 
 type Mode = "tts" | "stt" | "converter" | "merge" | "scheduler"
 
-// 🔹 Añadimos "gallego" al tipo Language
 type Language = "castellano" | "euskera" | "gallego" | "ingles" | "mexicano"
 
-// 🔹 Actualizamos las voces para que coincidan con el backend
 type VoiceAlias =
   | "chica"
   | "chico"
@@ -23,7 +21,6 @@ type VoiceAlias =
 
 type FormatId = "mp3" | "wav_yeastar"
 
-// 🔹 Mapeo voces por idioma (front) → alias que entiende el backend
 const VOICES: Record<Language, { id: VoiceAlias; label: string }[]> = {
   castellano: [
     { id: "chica", label: "Chica (ES)" },
@@ -53,7 +50,7 @@ const FORMATS: { id: FormatId; label: string }[] = [
 const SUPPORTED_FORMATS = ["mp3", "wav", "m4a", "flac", "ogg", "opus", "aac"]
 const INVALID_CHARACTERS = ["*", "?", '"', "<", ">", "|", ":", "\\"]
 
-// Converter: extensiones comunes (WhatsApp y más)
+// Converter
 const CONVERTER_ACCEPT_EXTS = [
   "mp3",
   "wav",
@@ -113,7 +110,7 @@ export default function Page() {
   const [ttsError, setTtsError] = useState("")
   const audioRef = useRef<HTMLAudioElement>(null)
 
-  const [speed, setSpeed] = useState<number>(1) // <<< velocidad (1 = normal)
+  const [speed, setSpeed] = useState<number>(1)
 
   const handleLanguageChange = (newLanguage: Language) => {
     setLanguage(newLanguage)
@@ -144,7 +141,7 @@ export default function Page() {
             format,
             filename,
             language,
-            speed, // <<< enviamos velocidad al backend
+            speed,
           }),
         },
         55000,
@@ -222,7 +219,7 @@ export default function Page() {
   const isValidFormat = SUPPORTED_FORMATS.includes(fileExtension)
   const hasInvalidCharacters = file?.name.split("").some((char) => INVALID_CHARACTERS.includes(char)) || false
 
-  // ---------- CONVERTER (usa /api/converter) ----------
+  // ---------- CONVERTER ----------
   const convInputRef = useRef<HTMLInputElement | null>(null)
   const [convBaseName, setConvBaseName] = useState<string>("")
   const [convOutputName, setConvOutputName] = useState<string>("")
@@ -280,7 +277,6 @@ export default function Page() {
       fd.append("audio", f)
       fd.append("baseName", base)
 
-      // fetch con timeout en cliente
       const controller = new AbortController()
       const t = setTimeout(() => controller.abort(), 55000)
       const res = await fetch("/api/converter", {
@@ -356,13 +352,11 @@ export default function Page() {
     )
   }
 
-  // etiqueta amigable para la velocidad
   const speedLabel = speed < 0.9 ? "Lenta" : speed > 1.1 ? "Rápida" : "Normal"
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="text-center w-full">
             <Image
@@ -377,11 +371,10 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-4 mb-8 bg-white rounded-lg shadow-lg p-2">
+        <div className="flex gap-4 mb-8 bg-white rounded-lg shadow-lg p-2 overflow-x-auto">
           <button
             onClick={() => setMode("tts")}
-            className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 ${
+            className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap ${
               mode === "tts" ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -389,7 +382,7 @@ export default function Page() {
           </button>
           <button
             onClick={() => setMode("stt")}
-            className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 ${
+            className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap ${
               mode === "stt" ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -397,17 +390,17 @@ export default function Page() {
           </button>
           <button
             onClick={() => setMode("converter")}
-            className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 ${
+            className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap ${
               mode === "converter"
                 ? "bg-blue-600 text-white shadow-md"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            🔄 Convertir a WAV_YEASTAR/3CX
+            🔄 Convertir a WAV_YEASTAR
           </button>
           <button
             onClick={() => setMode("merge")}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
+            className={`px-4 py-2 rounded-lg font-medium transition whitespace-nowrap ${
               mode === "merge" ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -415,11 +408,11 @@ export default function Page() {
           </button>
           <button
             onClick={() => setMode("scheduler")}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
+            className={`px-4 py-2 rounded-lg font-medium transition whitespace-nowrap ${
               mode === "scheduler" ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            ⏰ Mensajes por Horario
+            ⏰ IA Mensajes
           </button>
         </div>
 
@@ -427,7 +420,6 @@ export default function Page() {
           <div className="bg-white rounded-lg shadow-lg p-8">
             <h2 className="text-3xl font-bold text-slate-900 mb-6 text-center">🎧 Generador de Voz</h2>
 
-            {/* --- Información de idiomas y voces disponibles --- */}
             <div className="mb-8 grid sm:grid-cols-2 gap-4">
               <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
                 <h3 className="font-semibold text-blue-900 mb-2">🌍 Idiomas disponibles</h3>
@@ -453,7 +445,6 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Texto */}
             <div className="mb-6">
               <label className="text-sm font-semibold text-slate-900 mb-2 block">Locución (texto)</label>
               <textarea
@@ -463,13 +454,11 @@ export default function Page() {
                 placeholder="Escribe aquí lo que quieres locutar…"
               />
               <p className="text-xs text-slate-500 mt-2">
-                <b>Pausas:</b> Usa <code className="bg-slate-100 px-1 rounded">[pausa:X.Xs]</code> para insertar pausas. Ejemplo: <code className="bg-slate-100 px-1 rounded">Hola [pausa:2.5s] mundo</code> = pausa de 2.5 segundos. Usa punto (.) para decimales.
+                <b>Pausas:</b> Usa <code className="bg-slate-100 px-1 rounded">[pausa:X.Xs]</code> para insertar pausas. Ejemplo: <code className="bg-slate-100 px-1 rounded">Hola [pausa:2.5s] mundo</code>.
               </p>
             </div>
 
-            {/* Controles */}
             <div className="grid gap-4 sm:grid-cols-3">
-              {/* Selector idioma */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-900">Idioma</label>
                 <select
@@ -485,7 +474,6 @@ export default function Page() {
                 </select>
               </div>
 
-              {/* Selector voz */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-900">Voz</label>
                 <select
@@ -502,7 +490,6 @@ export default function Page() {
                 </select>
               </div>
 
-              {/* Formato */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-900">Formato</label>
                 <select
@@ -519,7 +506,6 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Velocidad */}
             <div className="mt-6 space-y-2">
               <label className="text-sm font-semibold text-slate-900 flex justify-between">
                 <span>Velocidad de locución</span>
@@ -538,7 +524,6 @@ export default function Page() {
               />
             </div>
 
-            {/* Nombre archivo */}
             <div className="mt-4 space-y-2">
               <label className="text-sm font-semibold text-slate-900">Nombre del archivo</label>
               <input
@@ -550,7 +535,6 @@ export default function Page() {
               <p className="text-xs text-slate-500">No pongas la extensión (mp3, wav…); se añade automáticamente.</p>
             </div>
 
-            {/* Botón generar */}
             <button
               onClick={generateVoice}
               disabled={loading}
@@ -559,12 +543,10 @@ export default function Page() {
               {loading ? "Generando..." : "▶ Generar voz"}
             </button>
 
-            {/* Error */}
             {ttsError && (
               <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{ttsError}</div>
             )}
 
-            {/* Player */}
             <div className="mt-8">
               <audio ref={audioRef} controls className="w-full" />
               {audioURL && (
@@ -579,11 +561,9 @@ export default function Page() {
             </div>
           </div>
         ) : mode === "stt" ? (
-          // ----------- STT -----------
           <div className="bg-white rounded-lg shadow-lg p-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-8 text-center">📝 Transcribir Audio</h2>
 
-            {/* Arrastrar y soltar */}
             <div
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
@@ -608,7 +588,6 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Archivo seleccionado */}
             {file && (
               <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <p className="text-sm font-medium text-slate-900">Archivo seleccionado:</p>
@@ -621,33 +600,13 @@ export default function Page() {
               </div>
             )}
 
-            {/* Ayuda */}
             <div className="space-y-4 mb-6">
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <h3 className="text-sm font-semibold text-blue-900 mb-2">Formatos Compatibles</h3>
                 <p className="text-xs text-blue-800">{SUPPORTED_FORMATS.join(", ").toUpperCase()}</p>
               </div>
-
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h3 className="text-sm font-semibold text-green-900 mb-2">Nombres Válidos</h3>
-                <p className="text-xs text-green-800">
-                  Usa letras, números, guiones y puntos. Sin espacios al inicio/final.
-                </p>
-              </div>
-
-              <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                <h3 className="text-sm font-semibold text-red-900 mb-2">Caracteres No Permitidos</h3>
-                <p className="text-xs text-red-800 font-mono">
-                  {INVALID_CHARACTERS.map((char) => (
-                    <span key={char} className="mr-2">
-                      &quot;{char}&quot;
-                    </span>
-                  ))}
-                </p>
-              </div>
             </div>
 
-            {/* Motor */}
             <div className="space-y-2 mb-6">
               <label className="text-sm font-semibold text-slate-900">Motor de Transcripción</label>
               <select
@@ -660,7 +619,6 @@ export default function Page() {
               </select>
             </div>
 
-            {/* Botón */}
             <button
               onClick={transcribe}
               disabled={sttLoading || !file || !isValidFormat || hasInvalidCharacters}
@@ -669,7 +627,6 @@ export default function Page() {
               {sttLoading ? "Transcribiendo..." : "📝 Transcribir Ahora"}
             </button>
 
-            {/* Transcripción */}
             {textOut && (
               <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex justify-between items-center mb-3">
@@ -685,7 +642,6 @@ export default function Page() {
               </div>
             )}
 
-            {/* Error */}
             {sttError && (
               <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <h3 className="text-sm font-semibold text-red-900 mb-2">Error</h3>
@@ -696,7 +652,6 @@ export default function Page() {
             )}
           </div>
         ) : mode === "converter" ? (
-          // ----------- CONVERTER -----------
           <div className="bg-white rounded-lg shadow-lg p-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-8 text-center">
               🔄 Convertir a WAV_YEASTAR/3CX (8kHz, Mono, 16-bit)
@@ -710,7 +665,6 @@ export default function Page() {
               onChange={onConvPick}
             />
 
-            {/* Dropzone grande */}
             <div
               onDragEnter={convDrag}
               onDragLeave={convDrag}
@@ -731,7 +685,6 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Estado / error */}
             {convError && (
               <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">
                 {convError}
@@ -753,7 +706,6 @@ export default function Page() {
               </div>
             )}
 
-            {/* Resultado */}
             {convDownloadUrl && (
               <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl p-3 border">
                 <div className="text-sm">
@@ -773,7 +725,6 @@ export default function Page() {
               </div>
             )}
 
-            {/* Tipos soportados visibles */}
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <h3 className="text-sm font-semibold text-blue-900 mb-2">Tipos admitidos</h3>
@@ -808,39 +759,16 @@ export default function Page() {
                   ref={mergeInputRef}
                   onChange={(e) => {
                     const files = Array.from(e.target.files || [])
-                    console.log(
-                      "[v0] Selected files for merging:",
-                      files.map((f) => f.name),
-                    )
                     setMergeFiles(files)
-                    setMergeError(null)
+                    setMergeError("")
                     if (files.length > 0) {
                       const firstFile = files[0].name
                       const baseName = firstFile.replace(/\.[^/.]+$/, "")
                       setMergedFileName(`${baseName}_combinado`)
                     }
                   }}
-                  className="block w-full text-sm text-slate-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-lg file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-blue-50 file:text-blue-700
-                    hover:file:bg-blue-100
-                    cursor-pointer"
+                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
-                <p className="mt-2 text-sm text-slate-500">
-                  Puedes seleccionar múltiples archivos WAV o MP3. Todos deben ser del mismo formato.
-                </p>
-                {mergeFiles.length > 0 && (
-                  <div className="mt-2 text-sm text-slate-600">
-                    <p className="font-medium">Archivos seleccionados ({mergeFiles.length}):</p>
-                    <ul className="list-disc list-inside">
-                      {mergeFiles.map((f, i) => (
-                        <li key={i}>{f.name}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
 
               <div>
@@ -860,33 +788,22 @@ export default function Page() {
                     setMergeError("Debes seleccionar al menos 2 archivos para unir")
                     return
                   }
-
                   setMergeLoading(true)
-                  setMergeError(null)
-
+                  setMergeError("")
                   try {
                     const formData = new FormData()
                     mergeFiles.forEach((file) => formData.append("files", file))
-
-                    const response = await fetch("/api/merge", {
-                      method: "POST",
-                      body: formData,
-                    })
-
+                    const response = await fetch("/api/merge", { method: "POST", body: formData })
                     if (!response.ok) {
                       const errorData = await response.json()
                       setMergeError(errorData.error || "Error al unir los archivos")
                       setMergeLoading(false)
                       return
                     }
-
                     const blob = await response.blob()
                     const url = URL.createObjectURL(blob)
-
-                    // Detect output format from first file
                     const extension = mergeFiles[0].name.toLowerCase().endsWith(".mp3") ? ".mp3" : ".wav"
                     const filename = `${mergedFileName}${extension}`
-
                     const a = document.createElement("a")
                     a.href = url
                     a.download = filename
@@ -894,19 +811,14 @@ export default function Page() {
                     a.click()
                     document.body.removeChild(a)
                     URL.revokeObjectURL(url)
-
-                    console.log("[v0] Audio files merged successfully")
                   } catch (error) {
-                    console.error("[v0] Error merging audio:", error)
                     setMergeError("Error al unir los archivos de audio")
                   } finally {
                     setMergeLoading(false)
                   }
                 }}
                 disabled={mergeLoading || mergeFiles.length < 2}
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-semibold
-                  hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg
-                  disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 disabled:opacity-50"
               >
                 {mergeLoading ? "Uniendo..." : "Unir Audios"}
               </button>
@@ -924,7 +836,6 @@ export default function Page() {
             )}
 
             <div className="space-y-6">
-              {/* Nombre de empresa */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Nombre de la empresa</label>
                 <input
@@ -932,11 +843,10 @@ export default function Page() {
                   value={schedCompanyName}
                   onChange={(e) => setSchedCompanyName(e.target.value)}
                   placeholder="Ej: Ausarta, Cefagasa"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
-              {/* Días de la semana */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-3">Días de atención</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -956,8 +866,6 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Horario partido */}
-              {/* Horario partido y Buzón de Voz */}
               <div className="flex flex-col gap-3 mb-4">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <input
@@ -968,7 +876,6 @@ export default function Page() {
                   />
                   Horario partido (cierre mediodía)
                 </label>
-
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <input
                     type="checkbox"
@@ -976,10 +883,10 @@ export default function Page() {
                     onChange={(e) => setSchedIncludeVoicemail(e.target.checked)}
                     className="rounded cursor-pointer"
                   />
-                  Incluir invitación al buzón de voz (mensaje fuera de horario)
+                  Incluir invitación al buzón de voz
                 </label>
               </div>
-              {/* Horarios */}
+
               {schedSplitSchedule ? (
                 <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
                   <p className="text-sm font-medium text-slate-700 mb-3">Turno mañana</p>
@@ -990,7 +897,7 @@ export default function Page() {
                         type="time"
                         value={schedOpenHour1}
                         onChange={(e) => setSchedOpenHour1(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                       />
                     </div>
                     <div>
@@ -999,7 +906,7 @@ export default function Page() {
                         type="time"
                         value={schedCloseHour1}
                         onChange={(e) => setSchedCloseHour1(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                       />
                     </div>
                   </div>
@@ -1012,7 +919,7 @@ export default function Page() {
                         type="time"
                         value={schedOpenHour2}
                         onChange={(e) => setSchedOpenHour2(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                       />
                     </div>
                     <div>
@@ -1021,7 +928,7 @@ export default function Page() {
                         type="time"
                         value={schedCloseHour2}
                         onChange={(e) => setSchedCloseHour2(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                       />
                     </div>
                   </div>
@@ -1034,7 +941,7 @@ export default function Page() {
                       type="time"
                       value={schedOpenHour1}
                       onChange={(e) => setSchedOpenHour1(e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg"
                     />
                   </div>
                   <div>
@@ -1043,13 +950,12 @@ export default function Page() {
                       type="time"
                       value={schedCloseHour1}
                       onChange={(e) => setSchedCloseHour1(e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg"
                     />
                   </div>
                 </div>
               )}
 
-              {/* Tipo de mensaje dentro de horario */}
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-slate-700">Tipo de mensaje (dentro de horario)</label>
                 <div className="flex gap-3">
@@ -1089,39 +995,20 @@ export default function Page() {
                 </div>
               )}
 
-              {/* Buzón de voz */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={schedIncludeVoicemail}
-                    onChange={(e) => setSchedIncludeVoicemail(e.target.checked)}
-                    className="rounded cursor-pointer"
-                  />
-                  Incluir opción de buzón de voz
-                </label>
-                <p className="text-xs text-slate-500 mt-1">Se generará un mensaje de buzón de voz con instrucciones</p>
-              </div>
-
-              {/* Botón generar */}
               <button
                 onClick={async () => {
                   if (!schedCompanyName.trim()) {
                     setSchedError("Por favor, ingresa el nombre de la empresa")
                     return
                   }
-
                   if (schedSelectedDays.length === 0) {
                     setSchedError("Por favor, selecciona al menos un día de atención")
                     return
                   }
-
                   setSchedGenerating(true)
                   setSchedError("")
                   setSchedInsideText("")
                   setSchedOutsideText("")
-                  // setSchedVoicemailText("") // Ya no es necesario limpiar esto por separado
-
                   try {
                     const res = await fetch("/api/scheduler", {
                       method: "POST",
@@ -1139,12 +1026,10 @@ export default function Page() {
                         includeVoicemail: schedIncludeVoicemail,
                       }),
                     })
-
                     if (!res.ok) {
                       const err = await res.json().catch(() => ({}))
                       throw new Error(err.error || `Error HTTP ${res.status}`)
                     }
-
                     const data = await res.json()
                     setSchedInsideText(data.messageInside)
                     setSchedOutsideText(data.messageOutside)
@@ -1156,15 +1041,12 @@ export default function Page() {
                   }
                 }}
                 disabled={schedGenerating || !schedCompanyName.trim() || schedSelectedDays.length === 0}
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-semibold
-                  hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg
-                  disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 disabled:opacity-50"
               >
                 {schedGenerating ? "Generando..." : "Generar Mensajes"}
               </button>
 
-              {/* Textos generados */}
-                  {(schedInsideText || schedOutsideText) && (
+              {(schedInsideText || schedOutsideText) && (
                 <div className="space-y-4 pt-4 border-t">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Mensaje - Dentro de horario</label>
@@ -1173,7 +1055,6 @@ export default function Page() {
                       onChange={(e) => setSchedInsideText(e.target.value)}
                       className="w-full px-4 py-3 border border-slate-300 rounded-lg min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <p className="text-xs text-slate-500 mt-1">Puedes editar el texto antes de generar audio</p>
                   </div>
 
                   <div>
@@ -1183,7 +1064,6 @@ export default function Page() {
                       onChange={(e) => setSchedOutsideText(e.target.value)}
                       className="w-full px-4 py-3 border border-slate-300 rounded-lg min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <p className="text-xs text-slate-500 mt-1">Puedes editar el texto antes de generar audio</p>
                   </div>
 
                   {schedVoicemailText && (
@@ -1194,22 +1074,15 @@ export default function Page() {
                         onChange={(e) => setSchedVoicemailText(e.target.value)}
                         className="w-full px-4 py-3 border border-slate-300 rounded-lg min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      <p className="text-xs text-slate-500 mt-1">Puedes editar el texto antes de generar audio</p>
                     </div>
                   )}
 
-                  {/* Bloque de botones para pasar a TTS con nombre automático */}
                   <div className={`grid gap-3 ${schedVoicemailText ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"}`}>
                     <button
                       onClick={() => {
-                        if (!schedInsideText.trim()) {
-                          setSchedError("El texto de dentro de horario está vacío")
-                          return
-                        }
-                        // 🔹 AQUI ESTÁ EL CAMBIO: Generar nombre empresa_DH
+                        if (!schedInsideText.trim()) return
                         const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
                         setFilename(`${safeName}_DH`)
-
                         setText(schedInsideText)
                         setMode("tts")
                       }}
@@ -1219,14 +1092,9 @@ export default function Page() {
                     </button>
                     <button
                       onClick={() => {
-                        if (!schedOutsideText.trim()) {
-                          setSchedError("El texto de fuera de horario está vacío")
-                          return
-                        }
-                        // 🔹 AQUI ESTÁ EL CAMBIO: Generar nombre empresa_FH
+                        if (!schedOutsideText.trim()) return
                         const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
                         setFilename(`${safeName}_FH`)
-
                         setText(schedOutsideText)
                         setMode("tts")
                       }}
@@ -1237,14 +1105,9 @@ export default function Page() {
                     {schedVoicemailText && (
                       <button
                         onClick={() => {
-                          if (!schedVoicemailText.trim()) {
-                            setSchedError("El texto de buzón está vacío")
-                            return
-                          }
-                          // 🔹 AQUI ESTÁ EL CAMBIO: Generar nombre empresa_BV
+                          if (!schedVoicemailText.trim()) return
                           const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
                           setFilename(`${safeName}_BV`)
-
                           setText(schedVoicemailText)
                           setMode("tts")
                         }}

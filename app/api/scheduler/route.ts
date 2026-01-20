@@ -6,8 +6,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const systemPrompt = "You are an expert in writing IVR scripts. Generate exactly one JSON with two keys: 'messageInside' and 'messageOutside'.";
-
 export async function POST(req: Request) {
   try {
     // Parsear body
@@ -23,7 +21,7 @@ export async function POST(req: Request) {
       closeTime2,
       insideType,
       ivrOptions,
-      includeVoicemail, // Declare the variable here
+      includeVoicemail,
     } = body;
 
     // Validación básica
@@ -51,7 +49,7 @@ export async function POST(req: Request) {
       saturday: "sábado",
       sunday: "domingo",
     };
-    const daysLabel = days.map((d) => dayLabels[d] || d).join(", ");
+    const daysLabel = days.map((d: string) => dayLabels[d] || d).join(", ");
 
     // Formatear horarios
     let scheduleText = `de ${openTime1} a ${closeTime1}`;
@@ -64,13 +62,11 @@ export async function POST(req: Request) {
     if (insideType === "welcome") {
       insideInstructions = `Solo debe decir: "Gracias por contactar con ${company}. Enseguida le atenderemos."`;
     } else if (insideType === "ivr") {
-      // Transformar las opciones a formato "Pulse X para..."
       let formattedOptions = "";
       if (ivrOptions) {
         const lines = ivrOptions.split("\n").filter((line: string) => line.trim());
         formattedOptions = lines
           .map((line: string) => {
-            // Si la línea ya tiene formato "1. Opción", transformarla a "Pulse 1 para Opción"
             const match = line.match(/^\d+\.\s*(.+)$/);
             if (match) {
               const number = line.match(/^(\d+)/)?.[1];
@@ -81,7 +77,7 @@ export async function POST(req: Request) {
           })
           .join(". ");
       }
-      insideInstructions = `Primero un saludo breve: "Gracias por llamar a ${company}". Luego, leer claramente cada opción con tonos marcados:\n${formattedOptions}`;
+      insideInstructions = `Primero un saludo breve: "Gracias por llamar a ${company}". Luego, leer claramente cada opción.`;
     }
 
     // Lógica para mensaje "Fuera de Horario"
@@ -105,7 +101,8 @@ messageVoicemail (instrucciones de buzón de voz - Máx 15 segundos):
 - Decir "Si desea dejar un mensaje, hágalo después de que suene la señal"
 - Incluir el horario de apertura: ${scheduleText}
 - Mensaje típico y profesional de buzón de voz
-- Agradecer por llamar`;
+- Agradecer por llamar
+- IMPORTANTE: Horas escritas en letra (ej: "las nueve de la mañana").`;
     }
 
     const userPrompt = `Eres un experto en redacción de guiones para sistemas IVR profesionales.
@@ -139,7 +136,7 @@ messageOutside (empresa CERRADA - Máx 20 segundos):
 - NO mencionar buzón de voz${voicemailInstructions}
 
 Responde SOLO con JSON válido, sin markdown ni explicaciones.`;
-    // Llamada a OpenAI
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -154,12 +151,10 @@ Responde SOLO con JSON válido, sin markdown ni explicaciones.`;
       throw new Error("Sin contenido de OpenAI");
     }
 
-    // Parsear JSON - extraer si es necesario
     let parsedData;
     try {
       parsedData = JSON.parse(content);
     } catch {
-      // Intentar extraer JSON del texto
       const match = content.match(/\{[\s\S]*\}/);
       if (!match) throw new Error("No se encontró JSON en respuesta");
       parsedData = JSON.parse(match[0]);
