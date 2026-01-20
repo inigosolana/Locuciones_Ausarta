@@ -371,45 +371,54 @@ export default function Page() {
           </div>
         </div>
 
-        <div className="flex gap-4 mb-8 bg-white rounded-lg shadow-lg p-2 overflow-x-auto">
+        {/* MENU NAVEGACION (GRANDE Y EN VARIAS LINEAS) */}
+        <div className="flex flex-wrap gap-3 mb-8 bg-white rounded-xl shadow-lg p-4 justify-center">
           <button
             onClick={() => setMode("tts")}
-            className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap ${
-              mode === "tts" ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className={`flex-grow md:flex-none py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 ${
+              mode === "tts"
+                ? "bg-blue-600 text-white shadow-lg scale-105"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105"
             }`}
           >
-            🎧 Generación de Voz
+            🎧 Generación Voz
           </button>
           <button
             onClick={() => setMode("stt")}
-            className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap ${
-              mode === "stt" ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className={`flex-grow md:flex-none py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 ${
+              mode === "stt"
+                ? "bg-blue-600 text-white shadow-lg scale-105"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105"
             }`}
           >
-            📝 Transcribir Audio
+            📝 Transcribir
           </button>
           <button
             onClick={() => setMode("converter")}
-            className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap ${
+            className={`flex-grow md:flex-none py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 ${
               mode === "converter"
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                ? "bg-blue-600 text-white shadow-lg scale-105"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105"
             }`}
           >
-            🔄 Convertir a WAV_YEASTAR
+            🔄 Convertidor
           </button>
           <button
             onClick={() => setMode("merge")}
-            className={`px-4 py-2 rounded-lg font-medium transition whitespace-nowrap ${
-              mode === "merge" ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className={`flex-grow md:flex-none py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 ${
+              mode === "merge"
+                ? "bg-blue-600 text-white shadow-lg scale-105"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105"
             }`}
           >
             🔗 Unir Audios
           </button>
           <button
             onClick={() => setMode("scheduler")}
-            className={`px-4 py-2 rounded-lg font-medium transition whitespace-nowrap ${
-              mode === "scheduler" ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            className={`flex-grow md:flex-none py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 ${
+              mode === "scheduler"
+                ? "bg-blue-600 text-white shadow-lg scale-105"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105"
             }`}
           >
             ⏰ IA Mensajes
