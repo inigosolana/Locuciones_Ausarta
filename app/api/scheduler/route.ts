@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- 1. PROCESAR HORARIOS PARA LA IA ---
+    // --- 1. PROCESAR HORARIOS (Texto legible para la IA) ---
     const dayLabels: Record<string, string> = {
       monday: "Lunes", tuesday: "Martes", wednesday: "Miércoles",
       thursday: "Jueves", friday: "Viernes", saturday: "Sábado", sunday: "Domingo",
@@ -33,71 +33,74 @@ export async function POST(req: Request) {
 
     const scheduleDescriptions = scheduleGroups.map((group: any) => {
       const daysText = group.days.map((d: string) => dayLabels[d] || d).join(", ");
-      
       let hoursText = "";
       if (group.splitSchedule) {
          hoursText = `de ${group.openTime1} a ${group.closeTime1} y de ${group.openTime2} a ${group.closeTime2}`;
       } else {
          hoursText = `de ${group.openTime1} a ${group.closeTime1}`;
       }
-      
       return `Los días ${daysText} abrimos ${hoursText}`;
     });
 
     const fullScheduleText = scheduleDescriptions.join(". \n");
 
-    // --- 2. PREPARAR INSTRUCCIONES ---
-    
-    // Mensaje DENTRO de horario
+    // --- 2. INSTRUCCIONES PARA "DENTRO DE HORARIO" (IVR o Bienvenida) ---
     let insideInstructions = "";
+    
     if (insideType === "welcome") {
       insideInstructions = `Solo debe decir: "Gracias por contactar con ${company}. Enseguida le atenderemos."`;
     } else if (insideType === "ivr") {
-      let formattedOptions = ivrOptions || "Espere para ser atendido.";
-      insideInstructions = `Primero un saludo breve: "Gracias por llamar a ${company}". Luego, leer claramente estas opciones: "${formattedOptions}".`;
+      // Instrucción específica para que lea las opciones correctamente
+      const rawOptions = ivrOptions || "1. Información";
+      insideInstructions = `
+        Estructura OBLIGATORIA para messageInside:
+        1. Saludo breve: "Gracias por llamar a ${company}".
+        2. Leer las siguientes opciones convertidas a formato hablado (Ej: "Para ventas, pulse uno"):
+        Opciones a leer: """${rawOptions}"""
+        3. Terminar con: "Por favor, manténgase a la espera."
+      `;
     }
 
-    // Mensaje BUZÓN DE VOZ (Aquí está el cambio que pediste)
+    // --- 3. INSTRUCCIONES PARA "BUZÓN DE VOZ" (Orden estricto) ---
     let voicemailPromptInfo = "";
     let jsonKeys = '"messageInside" y "messageOutside"';
 
     if (includeVoicemail) {
       jsonKeys += ' y "messageVoicemail"';
       voicemailPromptInfo = `
-messageVoicemail (instrucciones buzón - Máx 20s):
-1. Saludo indicando claramente que han llamado a ${company}.
-2. Informar del horario de atención: "${fullScheduleText}".
-3. FINALMENTE, decir la frase: "Por favor, deje un mensaje después de la señal".
-- Tono profesional.
+messageVoicemail (Instrucciones ESTRICTAS - Máx 20s):
+Debes seguir EXACTAMENTE este orden:
+1. Saludo: "Ha contactado con ${company}."
+2. Horario: Informar resumidamente del horario de apertura (${fullScheduleText}).
+3. Cierre: "Por favor, deje su mensaje después de la señal."
 `;
     }
 
-    // --- 3. PROMPT PARA GPT ---
-    const userPrompt = `Eres un experto en guiones IVR.
+    // --- 4. CONSTRUCCIÓN DEL PROMPT ---
+    const userPrompt = `Eres un experto en guiones telefónicos (IVR).
 Empresa: ${company}
-HORARIOS COMPLETOS:
+HORARIOS DETALLADOS:
 ${fullScheduleText}
 
 Genera un JSON válido con las claves: ${jsonKeys}.
 
 REGLAS DE FORMATO (OBLIGATORIAS):
-1. Escribe TODOS los números en letra (ej: "uno" no "1").
-2. Horas en formato natural hablado (ej: "las dos de la tarde").
-3. NO uses formato 24h.
+- Escribe TODOS los números en letra (ej: "pulse uno", "las dos de la tarde").
+- NO uses formato 24h (14:00 -> "las dos").
+- NO uses markdown (nada de **negritas** ni guiones -). Texto plano listo para ser hablado.
 
-messageInside (Empresa ABIERTA - Máx 25s):
+messageInside (Empresa ABIERTA - Máx 30s):
 ${insideInstructions}
 
 messageOutside (Empresa CERRADA - Máx 25s):
-- Saludo breve.
-- Disculparse por estar cerrado.
-- Informar del horario de atención de forma natural.
-- Agradecer y despedirse.
+- Saludo breve y profesional.
+- Indicar claramente que la empresa está cerrada.
+- Informar del horario de atención de forma natural hablada.
+- Despedida cordial.
 ${voicemailPromptInfo}
 
-Responde SOLO con JSON válido.`;
+Responde SOLO con el JSON raw.`;
 
-    // --- 4. LLAMADA A OPENAI ---
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: userPrompt }],
@@ -111,6 +114,7 @@ Responde SOLO con JSON válido.`;
     try {
         parsedData = JSON.parse(content);
     } catch {
+        // Intento de limpiar si GPT mete bloques de código ```json ... ```
         const match = content.match(/\{[\s\S]*\}/);
         if (!match) throw new Error("La IA no generó un JSON válido.");
         parsedData = JSON.parse(match[0]);
@@ -121,7 +125,7 @@ Responde SOLO con JSON válido.`;
   } catch (err: any) {
     console.error("Error scheduler:", err);
     return NextResponse.json(
-      { error: err.message || "Error interno." },
+      { error: err.message || "Error generando mensajes." },
       { status: 500 }
     );
   }
