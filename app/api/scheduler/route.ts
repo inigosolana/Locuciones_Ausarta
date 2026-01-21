@@ -44,24 +44,30 @@ export async function POST(req: Request) {
 
     const fullScheduleText = scheduleDescriptions.join(". \n");
 
-    // --- 2. INSTRUCCIONES PARA "DENTRO DE HORARIO" (IVR o Bienvenida) ---
+    // --- 2. INSTRUCCIONES PARA "DENTRO DE HORARIO" (IVR vs BIENVENIDA) ---
     let insideInstructions = "";
+    let insideTitleLabel = ""; // Para cambiar el título en el prompt
     
     if (insideType === "welcome") {
+      insideTitleLabel = "BIENVENIDA (Horario de Apertura)";
       insideInstructions = `Solo debe decir: "Gracias por contactar con ${company}. Enseguida le atenderemos."`;
     } else if (insideType === "ivr") {
-      // Instrucción específica para que lea las opciones correctamente
+      insideTitleLabel = "IVR (Menú de opciones)";
       const rawOptions = ivrOptions || "1. Información";
       insideInstructions = `
-        Estructura OBLIGATORIA para messageInside:
+        Estructura OBLIGATORIA para messageInside (Modo IVR):
         1. Saludo breve: "Gracias por llamar a ${company}".
         2. Leer las siguientes opciones convertidas a formato hablado (Ej: "Para ventas, pulse uno"):
         Opciones a leer: """${rawOptions}"""
-        3. Terminar con: "Por favor, manténgase a la espera."
+        
+        IMPORTANTE (Restricciones):
+        - NO digas "manténgase a la espera".
+        - NO digas "en breve le atenderemos".
+        - Termina justo después de decir la última opción.
       `;
     }
 
-    // --- 3. INSTRUCCIONES PARA "BUZÓN DE VOZ" (Orden estricto) ---
+    // --- 3. INSTRUCCIONES PARA "BUZÓN DE VOZ" ---
     let voicemailPromptInfo = "";
     let jsonKeys = '"messageInside" y "messageOutside"';
 
@@ -87,12 +93,12 @@ Genera un JSON válido con las claves: ${jsonKeys}.
 REGLAS DE FORMATO (OBLIGATORIAS):
 - Escribe TODOS los números en letra (ej: "pulse uno", "las dos de la tarde").
 - NO uses formato 24h (14:00 -> "las dos").
-- NO uses markdown (nada de **negritas** ni guiones -). Texto plano listo para ser hablado.
+- NO uses markdown. Texto plano.
 
-messageInside (Empresa ABIERTA - Máx 30s):
+messageInside (${insideTitleLabel} - Máx 45s):
 ${insideInstructions}
 
-messageOutside (Empresa CERRADA - Máx 25s):
+messageOutside (CERRADO - Máx 25s):
 - Saludo breve y profesional.
 - Indicar claramente que la empresa está cerrada.
 - Informar del horario de atención de forma natural hablada.
@@ -114,7 +120,6 @@ Responde SOLO con el JSON raw.`;
     try {
         parsedData = JSON.parse(content);
     } catch {
-        // Intento de limpiar si GPT mete bloques de código ```json ... ```
         const match = content.match(/\{[\s\S]*\}/);
         if (!match) throw new Error("La IA no generó un JSON válido.");
         parsedData = JSON.parse(match[0]);
