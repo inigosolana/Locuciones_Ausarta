@@ -1159,7 +1159,10 @@ export default function Page() {
               {(schedInsideText || schedOutsideText) && (
                 <div className="space-y-6 pt-6 border-t animate-in fade-in duration-500">
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Mensaje - Dentro de horario</label>
+                    {/* ETIQUETA DINÁMICA AQUÍ */}
+                    <label className="block text-sm font-bold text-slate-700 mb-2">
+                      {schedInsideType === "ivr" ? "Mensaje de IVR" : "Mensaje - Dentro de horario"}
+                    </label>
                     <textarea
                       value={schedInsideText}
                       onChange={(e) => setSchedInsideText(e.target.value)}
@@ -1192,14 +1195,17 @@ export default function Page() {
                       onClick={() => {
                         if (!schedInsideText.trim()) return
                         const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
-                        setFilename(`${safeName}_DH`)
+                        // Sufijo dinámico
+                        const suffix = schedInsideType === "ivr" ? "_IVR" : "_DH"
+                        setFilename(`${safeName}${suffix}`)
                         setText(schedInsideText)
                         setMode("tts")
                         window.scrollTo({ top: 0, behavior: 'smooth' })
                       }}
                       className="bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-medium text-sm shadow flex justify-center items-center gap-2"
                     >
-                      🎙️ Audio (Dentro)
+                      {/* Texto Botón dinámico */}
+                      🎙️ Audio ({schedInsideType === "ivr" ? "IVR" : "Dentro"})
                     </button>
                     <button
                       onClick={() => {
