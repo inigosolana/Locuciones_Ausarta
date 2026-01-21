@@ -75,9 +75,9 @@ export async function POST(req: Request) {
       jsonKeys += ' y "messageVoicemail"';
       voicemailPromptInfo = `
 messageVoicemail (instrucciones de buzón de voz - Máx 15 segundos):
-- Saludo breve
-- Decir "Si desea dejar un mensaje, hágalo después de que suene la señal"
+- Saludo breve, y nombre de empresa.
 - Mencionar resumidamente el horario general:
+- Decir "Si desea dejar un mensaje, hágalo después de que suene la señal"
 ${fullScheduleText}
 - Mensaje profesional.`;
     }
