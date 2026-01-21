@@ -4,6 +4,8 @@ import type React from "react"
 import Image from "next/image"
 import { useRef, useState, useCallback, type ChangeEvent } from "react"
 
+// --- TIPOS ---
+
 type Mode = "tts" | "stt" | "converter" | "merge" | "scheduler"
 
 type Language = "castellano" | "euskera" | "gallego" | "ingles" | "mexicano"
@@ -20,6 +22,18 @@ type VoiceAlias =
   | "mexicano"
 
 type FormatId = "mp3" | "wav_yeastar"
+
+interface ScheduleGroup {
+  id: string
+  days: string[]
+  splitSchedule: boolean
+  openTime1: string
+  closeTime1: string
+  openTime2: string
+  closeTime2: string
+}
+
+// --- CONSTANTES ---
 
 const VOICES: Record<Language, { id: VoiceAlias; label: string }[]> = {
   castellano: [
@@ -85,6 +99,16 @@ const CONVERTER_ACCEPT_ATTR = [
   ".mov",
   ".caf",
 ].join(",")
+
+const WEEK_DAYS = [
+  { id: "monday", label: "Lunes" },
+  { id: "tuesday", label: "Martes" },
+  { id: "wednesday", label: "Miércoles" },
+  { id: "thursday", label: "Jueves" },
+  { id: "friday", label: "Viernes" },
+  { id: "saturday", label: "Sábado" },
+  { id: "sunday", label: "Domingo" },
+]
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit, timeoutMs = 55000) {
   const controller = new AbortController()
@@ -319,14 +343,22 @@ export default function Page() {
   const [mergeError, setMergeError] = useState<string>("")
   const [mergedFileName, setMergedFileName] = useState<string>("")
 
-  // ---------- SCHEDULER ----------
+  // ---------- SCHEDULER (ACTUALIZADO CON GRUPOS) ----------
   const [schedCompanyName, setSchedCompanyName] = useState("")
-  const [schedOpenHour1, setSchedOpenHour1] = useState("09:00")
-  const [schedCloseHour1, setSchedCloseHour1] = useState("13:00")
-  const [schedOpenHour2, setSchedOpenHour2] = useState("15:00")
-  const [schedCloseHour2, setSchedCloseHour2] = useState("19:00")
-  const [schedSplitSchedule, setSchedSplitSchedule] = useState(false)
-  const [schedSelectedDays, setSchedSelectedDays] = useState<string[]>(["monday", "tuesday", "wednesday", "thursday", "friday"])
+  
+  // Estado para los grupos de horarios
+  const [schedGroups, setSchedGroups] = useState<ScheduleGroup[]>([
+    {
+      id: "1",
+      days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+      splitSchedule: false,
+      openTime1: "09:00",
+      closeTime1: "18:00",
+      openTime2: "16:00",
+      closeTime2: "19:00",
+    },
+  ])
+
   const [schedInsideType, setSchedInsideType] = useState<"welcome" | "ivr">("welcome")
   const [schedIvrOptions, setSchedIvrOptions] = useState("1. Atención al cliente\n2. Reclamaciones\n3. Información")
   const [schedGenerating, setSchedGenerating] = useState(false)
@@ -336,20 +368,55 @@ export default function Page() {
   const [schedIncludeVoicemail, setSchedIncludeVoicemail] = useState(false)
   const [schedVoicemailText, setSchedVoicemailText] = useState("")
 
-  const weekDays = [
-    { id: "monday", label: "Lunes" },
-    { id: "tuesday", label: "Martes" },
-    { id: "wednesday", label: "Miércoles" },
-    { id: "thursday", label: "Jueves" },
-    { id: "friday", label: "Viernes" },
-    { id: "saturday", label: "Sábado" },
-    { id: "sunday", label: "Domingo" },
-  ]
+  // -- Helpers de Grupos --
 
-  const toggleDay = (day: string) => {
-    setSchedSelectedDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+  const addScheduleGroup = () => {
+    setSchedGroups([
+      ...schedGroups,
+      {
+        id: Date.now().toString(),
+        days: [], // Se empieza vacío
+        splitSchedule: false,
+        openTime1: "08:00",
+        closeTime1: "15:00",
+        openTime2: "16:00",
+        closeTime2: "19:00",
+      },
+    ])
+  }
+
+  const removeScheduleGroup = (id: string) => {
+    setSchedGroups(schedGroups.filter((g) => g.id !== id))
+  }
+
+  const updateGroup = (id: string, field: keyof ScheduleGroup, value: any) => {
+    setSchedGroups((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, [field]: value } : g))
     )
+  }
+
+  const toggleDayInGroup = (groupId: string, dayId: string) => {
+    setSchedGroups((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupId) return g
+        const hasDay = g.days.includes(dayId)
+        return {
+          ...g,
+          days: hasDay ? g.days.filter((d) => d !== dayId) : [...g.days, dayId],
+        }
+      })
+    )
+  }
+
+  // Comprueba qué días están ya seleccionados en OTROS grupos para deshabilitarlos
+  const getDaysSelectedInOtherGroups = (currentGroupId: string) => {
+    const allSelected: string[] = []
+    schedGroups.forEach((g) => {
+      if (g.id !== currentGroupId) {
+        allSelected.push(...g.days)
+      }
+    })
+    return allSelected
   }
 
   const speedLabel = speed < 0.9 ? "Lenta" : speed > 1.1 ? "Rápida" : "Normal"
@@ -371,7 +438,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* MENU NAVEGACION (GRANDE Y EN VARIAS LINEAS) */}
+        {/* MENU NAVEGACION */}
         <div className="flex flex-wrap gap-3 mb-8 bg-white rounded-xl shadow-lg p-4 justify-center">
           <button
             onClick={() => setMode("tts")}
@@ -837,7 +904,7 @@ export default function Page() {
           <div className="bg-white rounded-lg shadow-lg p-8">
             <h2 className="text-2xl font-bold mb-2 text-slate-800">IA Mensajes</h2>
             <p className="text-slate-600 mb-6">
-              Genera automáticamente mensajes de respuesta automática (IVR) usando IA. Configura tu empresa, horario y días de atención.
+              Genera automáticamente mensajes de respuesta automática (IVR) usando IA. Configura tu empresa y sus diferentes horarios.
             </p>
 
             {schedError && (
@@ -856,153 +923,182 @@ export default function Page() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-3">Días de atención</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {weekDays.map((day) => (
-                    <button
-                      key={day.id}
-                      onClick={() => toggleDay(day.id)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
-                        schedSelectedDays.includes(day.id)
-                          ? "bg-blue-600 text-white"
-                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                      }`}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
+              {/* LISTA DE GRUPOS DE HORARIO */}
+              <div className="border-t pt-4">
+                <label className="block text-lg font-bold text-slate-800 mb-4">Configuración de Horarios</label>
+                
+                <div className="space-y-6">
+                  {schedGroups.map((group, index) => {
+                    const daysTaken = getDaysSelectedInOtherGroups(group.id)
+                    
+                    return (
+                      <div key={group.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 relative transition-all duration-200 hover:shadow-sm">
+                        {/* Botón borrar grupo (solo si hay más de uno) */}
+                        {schedGroups.length > 1 && (
+                          <button
+                            onClick={() => removeScheduleGroup(group.id)}
+                            className="absolute top-2 right-2 text-red-500 hover:text-red-700 text-xs font-bold px-2 py-1 bg-white rounded border border-red-100 hover:bg-red-50 transition"
+                          >
+                            ✕ Eliminar
+                          </button>
+                        )}
+
+                        <h4 className="text-sm font-bold text-blue-800 mb-3 uppercase tracking-wide">
+                          Bloque de Horario {index + 1}
+                        </h4>
+
+                        {/* Selector de Días */}
+                        <div className="mb-4">
+                          <label className="block text-xs font-medium text-slate-500 mb-2">Días aplicables</label>
+                          <div className="flex flex-wrap gap-2">
+                            {WEEK_DAYS.map((day) => {
+                              const isSelected = group.days.includes(day.id)
+                              const isDisabled = daysTaken.includes(day.id)
+                              return (
+                                <button
+                                  key={day.id}
+                                  disabled={isDisabled}
+                                  onClick={() => toggleDayInGroup(group.id, day.id)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition duration-200 ${
+                                    isSelected
+                                      ? "bg-blue-600 text-white border-blue-600 shadow-md transform scale-105"
+                                      : isDisabled
+                                      ? "bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed opacity-60"
+                                      : "bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600"
+                                  }`}
+                                >
+                                  {day.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Toggle Horario Partido */}
+                        <div className="mb-4">
+                           <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={group.splitSchedule}
+                              onChange={(e) => updateGroup(group.id, "splitSchedule", e.target.checked)}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                            <span>Activar horario partido (mañana y tarde)</span>
+                          </label>
+                        </div>
+
+                        {/* Inputs de Horas */}
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                          <div className="space-y-1">
+                            <label className="block text-xs text-slate-500 font-medium">
+                               {group.splitSchedule ? "Mañana: Apertura" : "Apertura"}
+                            </label>
+                            <input
+                              type="time"
+                              value={group.openTime1}
+                              onChange={(e) => updateGroup(group.id, "openTime1", e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="block text-xs text-slate-500 font-medium">
+                               {group.splitSchedule ? "Mañana: Cierre" : "Cierre"}
+                            </label>
+                            <input
+                              type="time"
+                              value={group.closeTime1}
+                              onChange={(e) => updateGroup(group.id, "closeTime1", e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                          
+                          {group.splitSchedule && (
+                            <>
+                              <div className="space-y-1">
+                                <label className="block text-xs text-slate-500 font-medium">Tarde: Apertura</label>
+                                <input
+                                  type="time"
+                                  value={group.openTime2}
+                                  onChange={(e) => updateGroup(group.id, "openTime2", e.target.value)}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="block text-xs text-slate-500 font-medium">Tarde: Cierre</label>
+                                <input
+                                  type="time"
+                                  value={group.closeTime2}
+                                  onChange={(e) => updateGroup(group.id, "closeTime2", e.target.value)}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
+
+                <button
+                  onClick={addScheduleGroup}
+                  className="mt-4 text-sm inline-flex items-center gap-2 font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-2 rounded-lg transition"
+                >
+                  <span className="text-lg leading-none">+</span> Añadir otro horario diferenciado (ej: Viernes)
+                </button>
               </div>
 
-              <div className="flex flex-col gap-3 mb-4">
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={schedSplitSchedule}
-                    onChange={(e) => setSchedSplitSchedule(e.target.checked)}
-                    className="rounded cursor-pointer"
-                  />
-                  Horario partido (cierre mediodía)
-                </label>
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              {/* OPCIONES GENERALES */}
+              <div className="space-y-4 pt-4 border-t">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 select-none">
                   <input
                     type="checkbox"
                     checked={schedIncludeVoicemail}
                     onChange={(e) => setSchedIncludeVoicemail(e.target.checked)}
-                    className="rounded cursor-pointer"
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                   />
                   Incluir invitación al buzón de voz
                 </label>
-              </div>
 
-              {schedSplitSchedule ? (
-                <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <p className="text-sm font-medium text-slate-700 mb-3">Turno mañana</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Apertura</label>
-                      <input
-                        type="time"
-                        value={schedOpenHour1}
-                        onChange={(e) => setSchedOpenHour1(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Cierre (mediodía)</label>
-                      <input
-                        type="time"
-                        value={schedCloseHour1}
-                        onChange={(e) => setSchedCloseHour1(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <p className="text-sm font-medium text-slate-700 mb-3 mt-4">Turno tarde</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Apertura (tarde)</label>
-                      <input
-                        type="time"
-                        value={schedOpenHour2}
-                        onChange={(e) => setSchedOpenHour2(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Cierre</label>
-                      <input
-                        type="time"
-                        value={schedCloseHour2}
-                        onChange={(e) => setSchedCloseHour2(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                      />
-                    </div>
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-slate-700">Tipo de mensaje (dentro de horario)</label>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setSchedInsideType("welcome")}
+                      className={`flex-1 px-4 py-2 rounded-lg font-medium transition text-sm ${
+                        schedInsideType === "welcome"
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      Bienvenida simple
+                    </button>
+                    <button
+                      onClick={() => setSchedInsideType("ivr")}
+                      className={`flex-1 px-4 py-2 rounded-lg font-medium transition text-sm ${
+                        schedInsideType === "ivr"
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      IVR (con opciones)
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
+
+                {schedInsideType === "ivr" && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Hora de apertura</label>
-                    <input
-                      type="time"
-                      value={schedOpenHour1}
-                      onChange={(e) => setSchedOpenHour1(e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Opciones del IVR</label>
+                    <textarea
+                      value={schedIvrOptions}
+                      onChange={(e) => setSchedIvrOptions(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono bg-slate-50"
+                      placeholder="1. Opción 1\n2. Opción 2\n3. Opción 3"
                     />
+                    <p className="text-xs text-slate-500 mt-1">Una opción por línea.</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Hora de cierre</label>
-                    <input
-                      type="time"
-                      value={schedCloseHour1}
-                      onChange={(e) => setSchedCloseHour1(e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-slate-700">Tipo de mensaje (dentro de horario)</label>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setSchedInsideType("welcome")}
-                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition text-sm ${
-                      schedInsideType === "welcome"
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
-                  >
-                    Bienvenida
-                  </button>
-                  <button
-                    onClick={() => setSchedInsideType("ivr")}
-                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition text-sm ${
-                      schedInsideType === "ivr"
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
-                  >
-                    IVR (con opciones)
-                  </button>
-                </div>
+                )}
               </div>
-
-              {schedInsideType === "ivr" && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Opciones del IVR</label>
-                  <textarea
-                    value={schedIvrOptions}
-                    onChange={(e) => setSchedIvrOptions(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="1. Opción 1\n2. Opción 2\n3. Opción 3"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Una opción por línea. La IA lo incorporará en el mensaje.</p>
-                </div>
-              )}
 
               <button
                 onClick={async () => {
@@ -1010,35 +1106,40 @@ export default function Page() {
                     setSchedError("Por favor, ingresa el nombre de la empresa")
                     return
                   }
-                  if (schedSelectedDays.length === 0) {
-                    setSchedError("Por favor, selecciona al menos un día de atención")
+                  if (schedGroups.length === 0) {
+                     setSchedError("Debes tener al menos un horario")
+                     return
+                  }
+                  // Validar que no haya grupos sin días
+                  const emptyGroupIndex = schedGroups.findIndex(g => g.days.length === 0);
+                  if (emptyGroupIndex >= 0) {
+                    setSchedError(`El bloque de horario ${emptyGroupIndex + 1} no tiene días seleccionados.`)
                     return
                   }
+
                   setSchedGenerating(true)
                   setSchedError("")
                   setSchedInsideText("")
                   setSchedOutsideText("")
+                  
                   try {
                     const res = await fetch("/api/scheduler", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         company: schedCompanyName,
-                        days: schedSelectedDays,
-                        splitSchedule: schedSplitSchedule,
-                        openTime1: schedOpenHour1,
-                        closeTime1: schedCloseHour1,
-                        openTime2: schedSplitSchedule ? schedOpenHour2 : null,
-                        closeTime2: schedSplitSchedule ? schedCloseHour2 : null,
+                        scheduleGroups: schedGroups, // Enviamos el array completo
                         insideType: schedInsideType,
                         ivrOptions: schedInsideType === "ivr" ? schedIvrOptions : null,
                         includeVoicemail: schedIncludeVoicemail,
                       }),
                     })
+                    
                     if (!res.ok) {
                       const err = await res.json().catch(() => ({}))
                       throw new Error(err.error || `Error HTTP ${res.status}`)
                     }
+                    
                     const data = await res.json()
                     setSchedInsideText(data.messageInside)
                     setSchedOutsideText(data.messageOutside)
@@ -1049,16 +1150,16 @@ export default function Page() {
                     setSchedGenerating(false)
                   }
                 }}
-                disabled={schedGenerating || !schedCompanyName.trim() || schedSelectedDays.length === 0}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 disabled:opacity-50"
+                disabled={schedGenerating || !schedCompanyName.trim()}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 disabled:opacity-50 shadow-lg"
               >
-                {schedGenerating ? "Generando..." : "Generar Mensajes"}
+                {schedGenerating ? "🤖 Generando Mensajes con IA..." : "✨ Generar Mensajes"}
               </button>
 
               {(schedInsideText || schedOutsideText) && (
-                <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-6 pt-6 border-t animate-in fade-in duration-500">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Mensaje - Dentro de horario</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Mensaje - Dentro de horario</label>
                     <textarea
                       value={schedInsideText}
                       onChange={(e) => setSchedInsideText(e.target.value)}
@@ -1067,7 +1168,7 @@ export default function Page() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Mensaje - Fuera de horario</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Mensaje - Fuera de horario</label>
                     <textarea
                       value={schedOutsideText}
                       onChange={(e) => setSchedOutsideText(e.target.value)}
@@ -1077,7 +1178,7 @@ export default function Page() {
 
                   {schedVoicemailText && (
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Mensaje - Buzón de voz</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Mensaje - Buzón de voz</label>
                       <textarea
                         value={schedVoicemailText}
                         onChange={(e) => setSchedVoicemailText(e.target.value)}
@@ -1094,10 +1195,11 @@ export default function Page() {
                         setFilename(`${safeName}_DH`)
                         setText(schedInsideText)
                         setMode("tts")
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
                       }}
-                      className="bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition font-medium text-sm"
+                      className="bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-medium text-sm shadow flex justify-center items-center gap-2"
                     >
-                      Audio (Dentro)
+                      🎙️ Audio (Dentro)
                     </button>
                     <button
                       onClick={() => {
@@ -1106,10 +1208,11 @@ export default function Page() {
                         setFilename(`${safeName}_FH`)
                         setText(schedOutsideText)
                         setMode("tts")
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
                       }}
-                      className="bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 transition font-medium text-sm"
+                      className="bg-orange-600 text-white py-3 rounded-lg hover:bg-orange-700 transition font-medium text-sm shadow flex justify-center items-center gap-2"
                     >
-                      Audio (Fuera)
+                      🎙️ Audio (Fuera)
                     </button>
                     {schedVoicemailText && (
                       <button
@@ -1119,10 +1222,11 @@ export default function Page() {
                           setFilename(`${safeName}_BV`)
                           setText(schedVoicemailText)
                           setMode("tts")
+                          window.scrollTo({ top: 0, behavior: 'smooth' })
                         }}
-                        className="bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition font-medium text-sm"
+                        className="bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition font-medium text-sm shadow flex justify-center items-center gap-2"
                       >
-                        Audio (Buzón)
+                        🎙️ Audio (Buzón)
                       </button>
                     )}
                   </div>
