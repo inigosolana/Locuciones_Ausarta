@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
     const {
       company,
-      scheduleGroups, // <--- CAMBIO: Recibimos un array de grupos en vez de horas sueltas
+      scheduleGroups, 
       insideType,
       ivrOptions,
       includeVoicemail,
@@ -20,14 +20,12 @@ export async function POST(req: Request) {
     // Validación básica
     if (!company || !scheduleGroups || scheduleGroups.length === 0) {
       return NextResponse.json(
-        { error: "Empresa y horarios son requeridos" },
+        { error: "Falta el nombre de la empresa o los horarios." },
         { status: 400 }
       );
     }
 
-    // --- CONSTRUCCIÓN DEL TEXTO DEL HORARIO PARA EL PROMPT ---
-    // Recorremos cada grupo y generamos una frase (ej: "Lunes, Martes: 09:00 a 18:00")
-    
+    // --- 1. PROCESAR HORARIOS PARA LA IA ---
     const dayLabels: Record<string, string> = {
       monday: "Lunes", tuesday: "Martes", wednesday: "Miércoles",
       thursday: "Jueves", friday: "Viernes", saturday: "Sábado", sunday: "Domingo",
@@ -43,70 +41,63 @@ export async function POST(req: Request) {
          hoursText = `de ${group.openTime1} a ${group.closeTime1}`;
       }
       
-      return `${daysText}: ${hoursText}`;
+      return `Los días ${daysText} abrimos ${hoursText}`;
     });
 
     const fullScheduleText = scheduleDescriptions.join(". \n");
-    // ---------------------------------------------------------
 
-    // Lógica para mensaje "Dentro de Horario" (Igual que antes)
+    // --- 2. PREPARAR INSTRUCCIONES ---
+    
+    // Mensaje DENTRO de horario
     let insideInstructions = "";
     if (insideType === "welcome") {
       insideInstructions = `Solo debe decir: "Gracias por contactar con ${company}. Enseguida le atenderemos."`;
     } else if (insideType === "ivr") {
-      // ... (Mismo código que tenías para IVR) ...
-      let formattedOptions = "";
-      if (ivrOptions) {
-        const lines = ivrOptions.split("\n").filter((line: string) => line.trim());
-        formattedOptions = lines.map((line: string) => line).join(". "); // Simplificado para el ejemplo
-      }
-      insideInstructions = `Primero un saludo breve: "Gracias por llamar a ${company}". Luego, leer claramente cada opción: ${formattedOptions}`;
+      let formattedOptions = ivrOptions || "Espere para ser atendido.";
+      insideInstructions = `Primero un saludo breve: "Gracias por llamar a ${company}". Luego, leer claramente estas opciones: "${formattedOptions}".`;
     }
 
-    // Lógica mensaje "Fuera de Horario"
-    let voicemailInstruction = includeVoicemail 
-      ? `Por favor, deje un mensaje y se pondrá en contacto con usted lo antes posible.` 
-      : `No hay línea telefónica disponible. Por favor, intente nuevamente más tarde.`;
-
-    let jsonKeys = '"messageInside" y "messageOutside"';
+    // Mensaje BUZÓN DE VOZ (Aquí está el cambio que pediste)
     let voicemailPromptInfo = "";
-    
+    let jsonKeys = '"messageInside" y "messageOutside"';
+
     if (includeVoicemail) {
       jsonKeys += ' y "messageVoicemail"';
       voicemailPromptInfo = `
-messageVoicemail (instrucciones de buzón de voz - Máx 15 segundos):
-- Saludo breve, y nombre de empresa.
-- Mencionar resumidamente el horario general:
-- Decir "Si desea dejar un mensaje, hágalo después de que suene la señal"
-${fullScheduleText}
-- Mensaje profesional.`;
+messageVoicemail (instrucciones buzón - Máx 20s):
+1. Saludo indicando claramente que han llamado a ${company}.
+2. Informar del horario de atención: "${fullScheduleText}".
+3. FINALMENTE, decir la frase: "Por favor, deje un mensaje después de la señal".
+- Tono profesional.
+`;
     }
 
-    const userPrompt = `Eres un experto en redacción de guiones para sistemas IVR profesionales.
-
+    // --- 3. PROMPT PARA GPT ---
+    const userPrompt = `Eres un experto en guiones IVR.
 Empresa: ${company}
-HORARIOS DETALLADOS:
+HORARIOS COMPLETOS:
 ${fullScheduleText}
 
 Genera un JSON válido con las claves: ${jsonKeys}.
 
-REGLAS DE FORMATO OBLIGATORIAS:
-1. Escribe TODOS los números en letra.
-2. Escribe TODAS las horas en letra y en formato natural hablado (ej: "las dos de la tarde").
+REGLAS DE FORMATO (OBLIGATORIAS):
+1. Escribe TODOS los números en letra (ej: "uno" no "1").
+2. Horas en formato natural hablado (ej: "las dos de la tarde").
 3. NO uses formato 24h.
 
-messageInside (empresa ABIERTA - Máx 25 segundos):
+messageInside (Empresa ABIERTA - Máx 25s):
 ${insideInstructions}
 
-messageOutside (empresa CERRADA - Máx 25 segundos):
-- Saludo breve y profesional.
+messageOutside (Empresa CERRADA - Máx 25s):
+- Saludo breve.
 - Disculparse por estar cerrado.
-- Informar del horario de atención RESUMIDO de forma natural (ej: "Atendemos de lunes a jueves de tal a cual, y los viernes de tal a cual"). Usa los datos de HORARIOS DETALLADOS.
-- Agradecer por llamar.
+- Informar del horario de atención de forma natural.
+- Agradecer y despedirse.
 ${voicemailPromptInfo}
 
 Responde SOLO con JSON válido.`;
 
+    // --- 4. LLAMADA A OPENAI ---
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: userPrompt }],
@@ -114,22 +105,24 @@ Responde SOLO con JSON válido.`;
     });
 
     const content = completion.choices[0].message.content;
-    if (!content) throw new Error("Sin contenido de OpenAI");
+    if (!content) throw new Error("OpenAI no devolvió contenido.");
 
-    // ... (Mismo código de parseo JSON que tenías) ...
     let parsedData;
     try {
         parsedData = JSON.parse(content);
     } catch {
         const match = content.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error("No se encontró JSON");
+        if (!match) throw new Error("La IA no generó un JSON válido.");
         parsedData = JSON.parse(match[0]);
     }
 
     return NextResponse.json(parsedData);
 
   } catch (err: any) {
-    console.error("Error scheduler:", err.message);
-    return NextResponse.json({ error: err.message || "Error" }, { status: 500 });
+    console.error("Error scheduler:", err);
+    return NextResponse.json(
+      { error: err.message || "Error interno." },
+      { status: 500 }
+    );
   }
 }
