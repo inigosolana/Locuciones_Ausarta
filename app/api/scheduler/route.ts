@@ -1,3 +1,4 @@
+// app/api/scheduler/route.ts
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -15,9 +16,9 @@ export async function POST(req: Request) {
       insideType,
       ivrOptions,
       includeVoicemail,
+      language = "castellano", // Nuevo campo
     } = body;
 
-    // Validación básica
     if (!company || !scheduleGroups || scheduleGroups.length === 0) {
       return NextResponse.json(
         { error: "Falta el nombre de la empresa o los horarios." },
@@ -25,92 +26,98 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- 1. PROCESAR HORARIOS (Texto legible para la IA) ---
-    const dayLabels: Record<string, string> = {
-      monday: "Lunes", tuesday: "Martes", wednesday: "Miércoles",
-      thursday: "Jueves", friday: "Viernes", saturday: "Sábado", sunday: "Domingo",
+    // Mapeo de idioma para el Prompt
+    const langPromptMap: Record<string, string> = {
+      castellano: "Spanish",
+      euskera: "Basque (Euskera)",
+      gallego: "Galician",
+      ingles: "English",
     };
+    const targetLang = langPromptMap[language] || "Spanish";
 
-    const scheduleDescriptions = scheduleGroups.map((group: any) => {
-      const daysText = group.days.map((d: string) => dayLabels[d] || d).join(", ");
-      let hoursText = "";
-      if (group.splitSchedule) {
-         hoursText = `de ${group.openTime1} a ${group.closeTime1} y de ${group.openTime2} a ${group.closeTime2}`;
-      } else {
-         hoursText = `de ${group.openTime1} a ${group.closeTime1}`;
-      }
-      return `Los días ${daysText} abrimos ${hoursText}`;
-    });
+    // Pasamos los horarios en JSON puro para que la IA los interprete en el idioma correcto
+    const scheduleJson = JSON.stringify(scheduleGroups);
 
-    const fullScheduleText = scheduleDescriptions.join(". \n");
-
-    // --- 2. INSTRUCCIONES PARA "DENTRO DE HORARIO" (IVR vs BIENVENIDA) ---
-    let insideInstructions = "";
-    let insideTitleLabel = ""; // Para cambiar el título en el prompt
+    // --- CONSTRUCCIÓN DE INSTRUCCIONES ---
     
+    // Instrucciones IVR / Bienvenida
+    let insideInstructions = "";
     if (insideType === "welcome") {
-      insideTitleLabel = "BIENVENIDA (Horario de Apertura)";
-      insideInstructions = `Solo debe decir: "Gracias por contactar con ${company}. Enseguida le atenderemos."`;
-    } else if (insideType === "ivr") {
-      insideTitleLabel = "IVR (Menú de opciones)";
-      const rawOptions = ivrOptions || "1. Información";
+      insideInstructions = `Generate a simple welcome message: "Thanks for contacting ${company}. We will attend you shortly." (Translated to ${targetLang}).`;
+    } else {
+      const rawOptions = ivrOptions || "1. Info";
       insideInstructions = `
-        Estructura OBLIGATORIA para messageInside (Modo IVR):
-        1. Saludo breve: "Gracias por llamar a ${company}".
-        2. Leer las siguientes opciones convertidas a formato hablado (Ej: "Para ventas, pulse uno"):
-        Opciones a leer: """${rawOptions}"""
-        
-        IMPORTANTE (Restricciones):
-        - NO digas "manténgase a la espera".
-        - NO digas "en breve le atenderemos".
-        - Termina justo después de decir la última opción.
+        Generate an IVR menu structure.
+        1. Brief greeting for ${company}.
+        2. Read these options naturally: """${rawOptions}""".
+        RULES:
+        - Do NOT say "please hold" or "we will attend you".
+        - Just the greeting and the options.
       `;
     }
 
-    // --- 3. INSTRUCCIONES PARA "BUZÓN DE VOZ" ---
-    let voicemailPromptInfo = "";
+    // Instrucciones Buzón de voz
+    let voicemailInstruction = "";
     let jsonKeys = '"messageInside" y "messageOutside"';
-
     if (includeVoicemail) {
       jsonKeys += ' y "messageVoicemail"';
-      voicemailPromptInfo = `
-messageVoicemail (Instrucciones ESTRICTAS - Máx 20s):
-Debes seguir EXACTAMENTE este orden:
-1. Saludo: "Ha contactado con ${company}."
-2. Horario: Informar resumidamente del horario de apertura (${fullScheduleText}).
-3. Cierre: "Por favor, deje su mensaje después de la señal."
-`;
+      voicemailInstruction = `
+        "messageVoicemail":
+        1. Greeting ("You have contacted ${company}").
+        2. Summarize the opening hours naturally based on the SCHEDULE_DATA.
+        3. Ask to leave a message after the signal.
+      `;
     }
 
-    // --- 4. CONSTRUCCIÓN DEL PROMPT ---
-    const userPrompt = `Eres un experto en guiones telefónicos (IVR).
-Empresa: ${company}
-HORARIOS DETALLADOS:
-${fullScheduleText}
+    // --- PROMPT MAESTRO ---
+    const userPrompt = `
+      Role: Expert IVR Scriptwriter.
+      Company: ${company}
+      Target Language: ${targetLang}
 
-Genera un JSON válido con las claves: ${jsonKeys}.
+      SCHEDULE_DATA (JSON):
+      ${scheduleJson}
 
-REGLAS DE FORMATO (OBLIGATORIAS):
-- Escribe TODOS los números en letra (ej: "pulse uno", "las dos de la tarde").
-- NO uses formato 24h (14:00 -> "las dos").
-- NO uses markdown. Texto plano.
+      TASK:
+      Generate a JSON object with keys: ${jsonKeys}.
+      The content of the messages must be in ${targetLang}.
 
-messageInside (${insideTitleLabel} - Máx 45s):
-${insideInstructions}
+      *** CRITICAL FORMATTING RULES (STRICT) ***:
+      1. **CASING (Minúsculas)**: Use "Sentence case". 
+         - Write mostly in lowercase.
+         - Only capitalize the very first letter of a sentence and Proper Nouns (names). 
+         - NEVER capitalize whole words or the start of every word.
+         - Example: "hola, gracias por llamar a Ausarta." (Correct) vs "Hola, Gracias Por Llamar A Ausarta" (Incorrect).
+      
+      2. **NATURAL TIME (Horas naturales)**: 
+         - Convert digital times (09:30, 15:45) into spoken words.
+         - **X:30** must be "y media" / "half past" / "eta erdiak". NEVER say "treinta".
+         - **X:15** must be "y cuarto" / "quarter past" / "eta laurden".
+         - **X:45** must be "menos cuarto" / "quarter to" / "laurden gutxi".
+         - Example (ES): "nueve y media", "tres menos cuarto de la tarde".
+         - Example (EU): "bederatzi eta erdiak", "hirurak laurden gutxi".
+         - Do NOT use digits like "9:30". Use always letters.
 
-messageOutside (CERRADO - Máx 25s):
-- Saludo breve y profesional.
-- Indicar claramente que la empresa está cerrada.
-- Informar del horario de atención de forma natural hablada.
-- Despedida cordial.
-${voicemailPromptInfo}
+      LOGIC FOR MESSAGES:
+      
+      "messageInside" (Open hours):
+      ${insideInstructions}
 
-Responde SOLO con el JSON raw.`;
+      "messageOutside" (Closed):
+      - Polite greeting.
+      - State clearly that the office is closed.
+      - Explain the opening hours naturally using the SCHEDULE_DATA.
+      - Polite goodbye.
+
+      ${voicemailInstruction}
+
+      Response format: Just raw JSON.
+    `;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: userPrompt }],
-      temperature: 0.7,
+      temperature: 0.5, // Bajamos temp para que respete mejor las reglas
     });
 
     const content = completion.choices[0].message.content;
@@ -120,6 +127,7 @@ Responde SOLO con el JSON raw.`;
     try {
         parsedData = JSON.parse(content);
     } catch {
+        // Intento de fallback si devuelve markdown ```json ... ```
         const match = content.match(/\{[\s\S]*\}/);
         if (!match) throw new Error("La IA no generó un JSON válido.");
         parsedData = JSON.parse(match[0]);

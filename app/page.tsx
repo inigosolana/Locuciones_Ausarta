@@ -343,8 +343,10 @@ export default function Page() {
   const [mergeError, setMergeError] = useState<string>("")
   const [mergedFileName, setMergedFileName] = useState<string>("")
 
-  // ---------- SCHEDULER (ACTUALIZADO CON GRUPOS) ----------
+  // ---------- SCHEDULER (ACTUALIZADO) ----------
   const [schedCompanyName, setSchedCompanyName] = useState("")
+  // NUEVO: Estado para el idioma del scheduler
+  const [schedLanguage, setSchedLanguage] = useState<"castellano" | "euskera" | "gallego" | "ingles">("castellano")
   
   // Estado para los grupos de horarios
   const [schedGroups, setSchedGroups] = useState<ScheduleGroup[]>([
@@ -912,15 +914,32 @@ export default function Page() {
             )}
 
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Nombre de la empresa</label>
-                <input
-                  type="text"
-                  value={schedCompanyName}
-                  onChange={(e) => setSchedCompanyName(e.target.value)}
-                  placeholder="Ej: Ausarta, Cefagasa"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
+              
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Nombre de la empresa</label>
+                  <input
+                    type="text"
+                    value={schedCompanyName}
+                    onChange={(e) => setSchedCompanyName(e.target.value)}
+                    placeholder="Ej: Ausarta, Cefagasa"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Idioma de los mensajes</label>
+                  <select
+                    value={schedLanguage}
+                    onChange={(e) => setSchedLanguage(e.target.value as any)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="castellano">🇪🇸 Castellano</option>
+                    <option value="euskera">🇪🇺 Euskera</option>
+                    <option value="gallego">🇬🇦 Gallego</option>
+                    <option value="ingles">🇬🇧 Inglés</option>
+                  </select>
+                </div>
               </div>
 
               {/* LISTA DE GRUPOS DE HORARIO */}
@@ -1128,10 +1147,11 @@ export default function Page() {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         company: schedCompanyName,
-                        scheduleGroups: schedGroups, // Enviamos el array completo
+                        scheduleGroups: schedGroups, 
                         insideType: schedInsideType,
                         ivrOptions: schedInsideType === "ivr" ? schedIvrOptions : null,
                         includeVoicemail: schedIncludeVoicemail,
+                        language: schedLanguage // Envía el idioma seleccionado a la API
                       }),
                     })
                     
@@ -1159,7 +1179,6 @@ export default function Page() {
               {(schedInsideText || schedOutsideText) && (
                 <div className="space-y-6 pt-6 border-t animate-in fade-in duration-500">
                   <div>
-                    {/* ETIQUETA DINÁMICA AQUÍ */}
                     <label className="block text-sm font-bold text-slate-700 mb-2">
                       {schedInsideType === "ivr" ? "Mensaje de IVR" : "Mensaje - Dentro de horario"}
                     </label>
@@ -1195,16 +1214,19 @@ export default function Page() {
                       onClick={() => {
                         if (!schedInsideText.trim()) return
                         const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
-                        // Sufijo dinámico
                         const suffix = schedInsideType === "ivr" ? "_IVR" : "_DH"
                         setFilename(`${safeName}${suffix}`)
                         setText(schedInsideText)
+                        
+                        // Sincronizar idioma TTS
+                        setLanguage(schedLanguage)
+                        setVoice(VOICES[schedLanguage][0].id)
+
                         setMode("tts")
                         window.scrollTo({ top: 0, behavior: 'smooth' })
                       }}
                       className="bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-medium text-sm shadow flex justify-center items-center gap-2"
                     >
-                      {/* Texto Botón dinámico */}
                       🎙️ Audio ({schedInsideType === "ivr" ? "IVR" : "Dentro"})
                     </button>
                     <button
@@ -1213,6 +1235,11 @@ export default function Page() {
                         const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
                         setFilename(`${safeName}_FH`)
                         setText(schedOutsideText)
+                        
+                        // Sincronizar idioma TTS
+                        setLanguage(schedLanguage)
+                        setVoice(VOICES[schedLanguage][0].id)
+
                         setMode("tts")
                         window.scrollTo({ top: 0, behavior: 'smooth' })
                       }}
@@ -1227,6 +1254,11 @@ export default function Page() {
                           const safeName = schedCompanyName.trim().replace(/\s+/g, "_") || "empresa"
                           setFilename(`${safeName}_BV`)
                           setText(schedVoicemailText)
+                          
+                          // Sincronizar idioma TTS
+                          setLanguage(schedLanguage)
+                          setVoice(VOICES[schedLanguage][0].id)
+
                           setMode("tts")
                           window.scrollTo({ top: 0, behavior: 'smooth' })
                         }}
