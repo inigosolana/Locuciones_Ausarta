@@ -1,4 +1,3 @@
-// app/api/scheduler/route.ts
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -16,7 +15,7 @@ export async function POST(req: Request) {
       insideType,
       ivrOptions,
       includeVoicemail,
-      language = "castellano", // Nuevo campo
+      language = "castellano",
     } = body;
 
     if (!company || !scheduleGroups || scheduleGroups.length === 0) {
@@ -26,7 +25,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // Mapeo de idioma para el Prompt
+    // 1. LIMPIEZA DE DATOS (CRÍTICO PARA EVITAR EL ERROR)
+    // Si no hay horario partido, eliminamos las horas de la tarde para que la IA no las vea.
+    const sanitizedSchedule = scheduleGroups.map((g: any) => {
+      if (!g.splitSchedule) {
+        // Desestructuramos para excluir openTime2 y closeTime2
+        const { openTime2, closeTime2, ...rest } = g;
+        return rest;
+      }
+      return g;
+    });
+
+    const scheduleJson = JSON.stringify(sanitizedSchedule);
+
+    // 2. MAPEO DE IDIOMA
     const langPromptMap: Record<string, string> = {
       castellano: "Spanish",
       euskera: "Basque (Euskera)",
@@ -35,12 +47,7 @@ export async function POST(req: Request) {
     };
     const targetLang = langPromptMap[language] || "Spanish";
 
-    // Pasamos los horarios en JSON puro para que la IA los interprete en el idioma correcto
-    const scheduleJson = JSON.stringify(scheduleGroups);
-
-    // --- CONSTRUCCIÓN DE INSTRUCCIONES ---
-    
-    // Instrucciones IVR / Bienvenida
+    // 3. INSTRUCCIONES ESPECÍFICAS
     let insideInstructions = "";
     if (insideType === "welcome") {
       insideInstructions = `Generate a simple welcome message: "Thanks for contacting ${company}. We will attend you shortly." (Translated to ${targetLang}).`;
@@ -56,7 +63,6 @@ export async function POST(req: Request) {
       `;
     }
 
-    // Instrucciones Buzón de voz
     let voicemailInstruction = "";
     let jsonKeys = '"messageInside" y "messageOutside"';
     if (includeVoicemail) {
@@ -69,7 +75,7 @@ export async function POST(req: Request) {
       `;
     }
 
-    // --- PROMPT MAESTRO ---
+    // 4. PROMPT MAESTRO
     const userPrompt = `
       Role: Expert IVR Scriptwriter.
       Company: ${company}
@@ -86,17 +92,19 @@ export async function POST(req: Request) {
       1. **CASING (Minúsculas)**: Use "Sentence case". 
          - Write mostly in lowercase.
          - Only capitalize the very first letter of a sentence and Proper Nouns (names). 
-         - NEVER capitalize whole words or the start of every word.
-         - Example: "hola, gracias por llamar a Ausarta." (Correct) vs "Hola, Gracias Por Llamar A Ausarta" (Incorrect).
+         - NEVER capitalize whole words.
       
       2. **NATURAL TIME (Horas naturales)**: 
-         - Convert digital times (09:30, 15:45) into spoken words.
-         - **X:30** must be "y media" / "half past" / "eta erdiak". NEVER say "treinta".
-         - **X:15** must be "y cuarto" / "quarter past" / "eta laurden".
-         - **X:45** must be "menos cuarto" / "quarter to" / "laurden gutxi".
-         - Example (ES): "nueve y media", "tres menos cuarto de la tarde".
-         - Example (EU): "bederatzi eta erdiak", "hirurak laurden gutxi".
-         - Do NOT use digits like "9:30". Use always letters.
+         - Convert digital times into spoken words (NO digits).
+         - X:00 -> "en punto" / "o'clock".
+         - X:30 -> "y media" / "half past" / "eta erdiak".
+         - X:15 -> "y cuarto" / "quarter past".
+         - X:45 -> "menos cuarto" / "quarter to".
+         - Example: "09:30" => "nueve y media".
+      
+      3. **SCHEDULE LOGIC**:
+         - Use ONLY the times present in SCHEDULE_DATA.
+         - If a group has NO "openTime2", it is NOT split schedule. Do not invent afternoon hours.
 
       LOGIC FOR MESSAGES:
       
@@ -117,7 +125,7 @@ export async function POST(req: Request) {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: userPrompt }],
-      temperature: 0.5, // Bajamos temp para que respete mejor las reglas
+      temperature: 0.5,
     });
 
     const content = completion.choices[0].message.content;
@@ -127,7 +135,6 @@ export async function POST(req: Request) {
     try {
         parsedData = JSON.parse(content);
     } catch {
-        // Intento de fallback si devuelve markdown ```json ... ```
         const match = content.match(/\{[\s\S]*\}/);
         if (!match) throw new Error("La IA no generó un JSON válido.");
         parsedData = JSON.parse(match[0]);
