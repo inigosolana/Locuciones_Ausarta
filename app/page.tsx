@@ -345,8 +345,10 @@ export default function Page() {
 
   // ---------- SCHEDULER (ACTUALIZADO) ----------
   const [schedCompanyName, setSchedCompanyName] = useState("")
-  // NUEVO: Estado para el idioma del scheduler
-  const [schedLanguage, setSchedLanguage] = useState<"castellano" | "euskera" | "gallego" | "ingles">("castellano")
+  // IDIOMA PRINCIPAL
+  const [schedLanguage, setSchedLanguage] = useState<Language>("castellano")
+  // IDIOMA SECUNDARIO (OPCIONAL)
+  const [schedSecondLanguage, setSchedSecondLanguage] = useState<Language | "none">("none")
   
   // Estado para los grupos de horarios
   const [schedGroups, setSchedGroups] = useState<ScheduleGroup[]>([
@@ -928,7 +930,7 @@ export default function Page() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Idioma de los mensajes</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Idioma Principal</label>
                   <select
                     value={schedLanguage}
                     onChange={(e) => setSchedLanguage(e.target.value as any)}
@@ -938,7 +940,24 @@ export default function Page() {
                     <option value="euskera">🇪🇺 Euskera</option>
                     <option value="gallego">🇬🇦 Gallego</option>
                     <option value="ingles">🇬🇧 Inglés</option>
+                    <option value="mexicano">🇲🇽 Mexicano</option>
                   </select>
+
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Segundo Idioma (Opcional - Bilingüe)</label>
+                    <select
+                      value={schedSecondLanguage}
+                      onChange={(e) => setSchedSecondLanguage(e.target.value as any)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      <option value="none">-- Ninguno --</option>
+                      <option value="castellano">🇪🇸 Castellano</option>
+                      <option value="euskera">🇪🇺 Euskera</option>
+                      <option value="gallego">🇬🇦 Gallego</option>
+                      <option value="ingles">🇬🇧 Inglés</option>
+                      <option value="mexicano">🇲🇽 Mexicano</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1151,7 +1170,8 @@ export default function Page() {
                         insideType: schedInsideType,
                         ivrOptions: schedInsideType === "ivr" ? schedIvrOptions : null,
                         includeVoicemail: schedIncludeVoicemail,
-                        language: schedLanguage // Envía el idioma seleccionado a la API
+                        language: schedLanguage,
+                        secondLanguage: schedSecondLanguage === "none" ? null : schedSecondLanguage
                       }),
                     })
                     
@@ -1218,7 +1238,7 @@ export default function Page() {
                         setFilename(`${safeName}${suffix}`)
                         setText(schedInsideText)
                         
-                        // Sincronizar idioma TTS
+                        // Sincronizar idioma TTS (Usamos el principal como base)
                         setLanguage(schedLanguage)
                         setVoice(VOICES[schedLanguage][0].id)
 
@@ -1236,7 +1256,6 @@ export default function Page() {
                         setFilename(`${safeName}_FH`)
                         setText(schedOutsideText)
                         
-                        // Sincronizar idioma TTS
                         setLanguage(schedLanguage)
                         setVoice(VOICES[schedLanguage][0].id)
 
@@ -1255,7 +1274,6 @@ export default function Page() {
                           setFilename(`${safeName}_BV`)
                           setText(schedVoicemailText)
                           
-                          // Sincronizar idioma TTS
                           setLanguage(schedLanguage)
                           setVoice(VOICES[schedLanguage][0].id)
 

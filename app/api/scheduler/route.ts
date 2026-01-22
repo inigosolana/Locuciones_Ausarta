@@ -16,6 +16,7 @@ export async function POST(req: Request) {
       ivrOptions,
       includeVoicemail,
       language = "castellano",
+      secondLanguage = null, // Nuevo campo
     } = body;
 
     if (!company || !scheduleGroups || scheduleGroups.length === 0) {
@@ -25,32 +26,49 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. LIMPIEZA DE DATOS (CRÍTICO PARA EVITAR EL ERROR)
-    // Si no hay horario partido, eliminamos las horas de la tarde para que la IA no las vea.
+    // 1. LIMPIEZA DE DATOS (Horario Partido)
     const sanitizedSchedule = scheduleGroups.map((g: any) => {
       if (!g.splitSchedule) {
-        // Desestructuramos para excluir openTime2 y closeTime2
         const { openTime2, closeTime2, ...rest } = g;
         return rest;
       }
       return g;
     });
-
     const scheduleJson = JSON.stringify(sanitizedSchedule);
 
-    // 2. MAPEO DE IDIOMA
+    // 2. CONFIGURACIÓN IDIOMAS
     const langPromptMap: Record<string, string> = {
       castellano: "Spanish",
       euskera: "Basque (Euskera)",
       gallego: "Galician",
       ingles: "English",
+      mexicano: "Mexican Spanish",
     };
-    const targetLang = langPromptMap[language] || "Spanish";
+
+    const primaryLangName = langPromptMap[language] || "Spanish";
+    
+    let bilingualInstruction = "Write the messages strictly in the Target Language defined above.";
+    let targetLangLabel = primaryLangName;
+
+    // Si se seleccionó un segundo idioma y es diferente al primero
+    if (secondLanguage && secondLanguage !== "none" && secondLanguage !== language) {
+        const secondaryLangName = langPromptMap[secondLanguage];
+        targetLangLabel = `${primaryLangName} AND ${secondaryLangName}`;
+        bilingualInstruction = `
+        CRITICAL - BILINGUAL MODE:
+        For every message field ("messageInside", "messageOutside", etc.):
+        1. Write the text in ${primaryLangName} first.
+        2. Insert exactly this tag: [pausa:1.5s]
+        3. Write the exact same meaning in ${secondaryLangName}.
+        
+        Example structure: "Texto en ${primaryLangName} [pausa:1.5s] Texto en ${secondaryLangName}"
+        `;
+    }
 
     // 3. INSTRUCCIONES ESPECÍFICAS
     let insideInstructions = "";
     if (insideType === "welcome") {
-      insideInstructions = `Generate a simple welcome message: "Thanks for contacting ${company}. We will attend you shortly." (Translated to ${targetLang}).`;
+      insideInstructions = `Generate a simple welcome message: "Thanks for contacting ${company}. We will attend you shortly."`;
     } else {
       const rawOptions = ivrOptions || "1. Info";
       insideInstructions = `
@@ -59,7 +77,7 @@ export async function POST(req: Request) {
         2. Read these options naturally: """${rawOptions}""".
         RULES:
         - Do NOT say "please hold" or "we will attend you".
-        - Just the greeting and the options.
+        - Terminate after the last option.
       `;
     }
 
@@ -79,34 +97,28 @@ export async function POST(req: Request) {
     const userPrompt = `
       Role: Expert IVR Scriptwriter.
       Company: ${company}
-      Target Language: ${targetLang}
+      Target Language: ${targetLangLabel}
 
       SCHEDULE_DATA (JSON):
       ${scheduleJson}
 
       TASK:
       Generate a JSON object with keys: ${jsonKeys}.
-      The content of the messages must be in ${targetLang}.
+
+      ${bilingualInstruction}
 
       *** CRITICAL FORMATTING RULES (STRICT) ***:
-      1. **CASING (Minúsculas)**: Use "Sentence case". 
-         - Write mostly in lowercase.
-         - Only capitalize the very first letter of a sentence and Proper Nouns (names). 
-         - NEVER capitalize whole words.
+      1. **CASING (Minúsculas)**: Use "Sentence case" (mostly lowercase). 
+         Example: "hola, bienvenidos a Ausarta."
       
       2. **NATURAL TIME (Horas naturales)**: 
          - Convert digital times into spoken words (NO digits).
-         - X:00 -> "en punto" / "o'clock".
-         - X:30 -> "y media" / "half past" / "eta erdiak".
-         - X:15 -> "y cuarto" / "quarter past".
-         - X:45 -> "menos cuarto" / "quarter to".
-         - Example: "09:30" => "nueve y media".
-      
-      3. **SCHEDULE LOGIC**:
+         - In Spanish: X:30 -> "y media", X:15 -> "y cuarto", X:45 -> "menos cuarto".
+         - In English: X:30 -> "half past", X:15 -> "quarter past", X:45 -> "quarter to".
+         - In Basque (Euskera): X:30 -> "eta erdiak", X:45 -> "laurden gutxi", etc.
          - Use ONLY the times present in SCHEDULE_DATA.
-         - If a group has NO "openTime2", it is NOT split schedule. Do not invent afternoon hours.
 
-      LOGIC FOR MESSAGES:
+      LOGIC FOR MESSAGES (Apply Bilingual Rule if enabled):
       
       "messageInside" (Open hours):
       ${insideInstructions}
