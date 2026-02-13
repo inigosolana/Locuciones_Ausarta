@@ -224,6 +224,7 @@ export async function POST(req: NextRequest) {
       voice?:
         | "chica"
         | "chico"
+        | "ausarta"
         | "euskera_chico"
         | "euskera_chica"
         | "gallego_chico"
@@ -250,6 +251,7 @@ export async function POST(req: NextRequest) {
     const isCartesia =
       voice === "chica" ||
       voice === "chico" ||
+      voice === "ausarta" ||
       voice === "mexicano" ||
       voice === "euskera_chico" ||
       voice === "euskera_chica" ||
@@ -414,7 +416,7 @@ export async function POST(req: NextRequest) {
 
       // 🔹 Language: SOLO lo enviamos para voces en español/mexicano.
       let language: string | undefined = undefined
-      if (voice === "chica" || voice === "chico" || voice === "mexicano") {
+      if (voice === "chica" || voice === "chico" || voice === "ausarta" || voice === "mexicano") {
         language = "es"
       }
 
