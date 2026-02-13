@@ -13,6 +13,7 @@ type Language = "castellano" | "euskera" | "gallego" | "ingles" | "mexicano"
 type VoiceAlias =
   | "chica"
   | "chico"
+  | "ausarta"
   | "euskera_chico"
   | "euskera_chica"
   | "gallego_chico"
@@ -39,6 +40,7 @@ const VOICES: Record<Language, { id: VoiceAlias; label: string }[]> = {
   castellano: [
     { id: "chica", label: "Chica (ES)" },
     { id: "chico", label: "Chico (ES)" },
+    { id: "ausarta", label: "Voz Ausarta" },
   ],
   euskera: [
     { id: "euskera_chico", label: "Chico (Euskera)" },

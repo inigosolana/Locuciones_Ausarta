@@ -7,6 +7,7 @@ export const runtime = "edge"
 const VOICES: Record<
   | "chica"
   | "chico"
+  | "ausarta"
   | "euskera_chico"
   | "euskera_chica"
   | "gallego_chico"
@@ -18,6 +19,7 @@ const VOICES: Record<
 > = {
   chica: "a2f12ebd-80df-4de7-83f3-809599135b1d",
   chico: "3380a516-6acc-4389-97c8-68273b540dd3",
+  ausarta: "8de24760-f0de-43ce-89b6-2bc95a8c75a2",
 
   euskera_chico: "727e60f9-789e-4dfb-9be1-4bc1f9f755c6",
   euskera_chica: "74d84f24-85b5-4938-9fd1-d6c90eb5d7ab",
