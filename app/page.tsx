@@ -13,6 +13,7 @@ type Language = "castellano" | "euskera" | "gallego" | "ingles" | "mexicano"
 type VoiceAlias =
   | "chica"
   | "chico"
+  | "ausarta"
   | "euskera_chico"
   | "euskera_chica"
   | "gallego_chico"
