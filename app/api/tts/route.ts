@@ -416,7 +416,7 @@ export async function POST(req: NextRequest) {
 
       // 🔹 Language: SOLO lo enviamos para voces en español/mexicano.
       let language: string | undefined = undefined
-      if (voice === "chica" || voice === "chico" || voice === "mexicano") {
+      if (voice === "chica" || voice === "chico" || voice === "ausarta" || voice === "mexicano") {
         language = "es"
       }
 
