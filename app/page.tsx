@@ -6,7 +6,7 @@ import { useRef, useState, useCallback, type ChangeEvent } from "react"
 
 // --- TIPOS ---
 
-type Mode = "tts" | "stt" | "converter" | "merge" | "scheduler"
+type Mode = "tts" | "stt" | "converter" | "merge" | "scheduler" | "festivos"
 
 type Language = "castellano" | "euskera" | "gallego" | "ingles" | "mexicano"
 
@@ -143,6 +143,19 @@ export default function Page() {
   const [translating, setTranslating] = useState(false)
   const [translationError, setTranslationError] = useState("")
 
+  // ---------- FESTIVOS ----------
+  const [festiveName, setFestiveName] = useState("")
+  const [festiveDate, setFestiveDate] = useState("")
+  const [festiveCompany, setFestiveCompany] = useState("")
+  const [festiveType, setFestiveType] = useState<"nacional" | "autonomico" | "local">("nacional")
+  const [festiveAutonomy, setFestiveAutonomy] = useState("")
+  const [festiveLanguages, setFestiveLanguages] = useState<Language[]>(["castellano"])
+  const [festiveLoading, setFestiveLoading] = useState(false)
+  const [festiveError, setFestiveError] = useState("")
+  const [festiveMessages, setFestiveMessages] = useState<Record<Language, string>>({})
+  const [festiveAudios, setFestiveAudios] = useState<Record<Language, string>>({})
+  const [generatingFestiveAudio, setGeneratingFestiveAudio] = useState<Language | null>(null)
+
   const handleLanguageChange = (newLanguage: Language) => {
     setLanguage(newLanguage)
     setVoice(VOICES[newLanguage][0].id)
@@ -184,6 +197,92 @@ export default function Page() {
       setTranslationError(error.message || "Error desconocido")
     } finally {
       setTranslating(false)
+    }
+  }
+
+  const generateFestiveMessages = async () => {
+    if (!festiveName.trim() || !festiveDate || !festiveCompany.trim() || festiveLanguages.length === 0) {
+      setFestiveError("Por favor completa todos los campos")
+      return
+    }
+
+    setFestiveLoading(true)
+    setFestiveError("")
+    setFestiveMessages({})
+    setFestiveAudios({})
+
+    try {
+      const res = await fetchWithTimeout(
+        "/api/festivos",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            festiveName,
+            date: festiveDate,
+            company: festiveCompany,
+            type: festiveType,
+            autonomyOrLocation: festiveAutonomy,
+            languages: festiveLanguages,
+          }),
+        },
+        30000
+      )
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Error generando mensajes")
+      }
+
+      const data = await res.json()
+      setFestiveMessages(data.messages)
+    } catch (error: any) {
+      setFestiveError(error.message || "Error desconocido")
+    } finally {
+      setFestiveLoading(false)
+    }
+  }
+
+  const generateFestiveAudio = async (lang: Language) => {
+    const messageText = festiveMessages[lang]
+    if (!messageText) {
+      setFestiveError("No hay mensaje para este idioma")
+      return
+    }
+
+    setGeneratingFestiveAudio(lang)
+    setFestiveError("")
+
+    try {
+      const voiceForLang = VOICES[lang][0].id
+
+      const res = await fetchWithTimeout(
+        "/api/tts",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: messageText,
+            voice: voiceForLang,
+            format: "mp3",
+            filename: `festivo_${lang}`,
+            speed: 1,
+          }),
+        },
+        55000
+      )
+
+      if (!res.ok) {
+        throw new Error("Error generando audio")
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      setFestiveAudios((prev) => ({ ...prev, [lang]: url }))
+    } catch (error: any) {
+      setFestiveError(error.message || "Error generando audio")
+    } finally {
+      setGeneratingFestiveAudio(null)
     }
   }
 
@@ -537,6 +636,16 @@ export default function Page() {
             }`}
           >
             ⏰ IA Generador Locucion
+          </button>
+          <button
+            onClick={() => setMode("festivos")}
+            className={`flex-grow md:flex-none py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 ${
+              mode === "festivos"
+                ? "bg-blue-600 text-white shadow-lg scale-105"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105"
+            }`}
+          >
+            🎉 Generador Festivos
           </button>
         </div>
 
@@ -1357,6 +1466,217 @@ export default function Page() {
                       </button>
                     )}
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : mode === "festivos" ? (
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <h2 className="text-3xl font-bold text-slate-900 mb-6 text-center">🎉 Generador de Festivos</h2>
+
+            <div className="space-y-6 mb-8">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Nombre del festivo</label>
+                <input
+                  type="text"
+                  value={festiveName}
+                  onChange={(e) => setFestiveName(e.target.value)}
+                  placeholder="Ej: Navidad, Rebajas, Aniversario..."
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Fecha</label>
+                  <input
+                    type="date"
+                    value={festiveDate}
+                    onChange={(e) => setFestiveDate(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Empresa</label>
+                  <input
+                    type="text"
+                    value={festiveCompany}
+                    onChange={(e) => setFestiveCompany(e.target.value)}
+                    placeholder="Nombre de la empresa"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Tipo de festivo</label>
+                <div className="flex gap-3 flex-wrap">
+                  <button
+                    onClick={() => setFestiveType("nacional")}
+                    className={`px-4 py-2 rounded-lg font-medium transition ${
+                      festiveType === "nacional"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    Nacional
+                  </button>
+                  <button
+                    onClick={() => setFestiveType("autonomico")}
+                    className={`px-4 py-2 rounded-lg font-medium transition ${
+                      festiveType === "autonomico"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    Autonómico
+                  </button>
+                  <button
+                    onClick={() => setFestiveType("local")}
+                    className={`px-4 py-2 rounded-lg font-medium transition ${
+                      festiveType === "local"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    Local
+                  </button>
+                </div>
+              </div>
+
+              {(festiveType === "autonomico" || festiveType === "local") && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    {festiveType === "autonomico" ? "Comunidad Autónoma" : "Localidad"}
+                  </label>
+                  <input
+                    type="text"
+                    value={festiveAutonomy}
+                    onChange={(e) => setFestiveAutonomy(e.target.value)}
+                    placeholder={festiveType === "autonomico" ? "Ej: Cataluña, Euskadi..." : "Ej: Madrid, Barcelona..."}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3">Idiomas para generar</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {Object.keys(VOICES).map((lang) => (
+                    <label key={lang} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={festiveLanguages.includes(lang as Language)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFestiveLanguages([...festiveLanguages, lang as Language])
+                          } else {
+                            setFestiveLanguages(festiveLanguages.filter((l) => l !== lang))
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <span className="text-sm font-medium text-slate-700">
+                        {lang === "castellano"
+                          ? "🇪🇸 Castellano"
+                          : lang === "euskera"
+                            ? "🇪🇺 Euskera"
+                            : lang === "gallego"
+                              ? "🇬🇦 Gallego"
+                              : lang === "ingles"
+                                ? "🇬🇧 Inglés"
+                                : "🇲🇽 Mexicano"}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={generateFestiveMessages}
+                disabled={festiveLoading || !festiveName.trim() || !festiveDate || !festiveCompany.trim()}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 disabled:opacity-50 shadow-lg"
+              >
+                {festiveLoading ? "🤖 Generando mensajes..." : "✨ Generar Mensajes"}
+              </button>
+
+              {festiveError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                  {festiveError}
+                </div>
+              )}
+
+              {Object.keys(festiveMessages).length > 0 && (
+                <div className="space-y-6 pt-6 border-t">
+                  <h3 className="text-xl font-bold text-slate-900">Mensajes generados</h3>
+                  {festiveLanguages.map((lang) => (
+                    <div key={lang} className="border border-slate-200 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-lg font-semibold text-slate-800">
+                          {lang === "castellano"
+                            ? "🇪🇸 Castellano"
+                            : lang === "euskera"
+                              ? "🇪🇺 Euskera"
+                              : lang === "gallego"
+                                ? "🇬🇦 Gallego"
+                                : lang === "ingles"
+                                  ? "🇬🇧 Inglés"
+                                  : "🇲🇽 Mexicano"}
+                        </h4>
+                        <button
+                          onClick={() => generateFestiveAudio(lang)}
+                          disabled={generatingFestiveAudio === lang}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-medium text-sm disabled:opacity-50"
+                        >
+                          {generatingFestiveAudio === lang ? "🎙️ Generando..." : "🎙️ Generar Audio"}
+                        </button>
+                      </div>
+
+                      <textarea
+                        value={festiveMessages[lang] || ""}
+                        onChange={(e) => setFestiveMessages({ ...festiveMessages, [lang]: e.target.value })}
+                        className="w-full px-4 py-3 border border-slate-300 rounded-lg min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+
+                      {festiveAudios[lang] && (
+                        <div className="mt-3">
+                          <audio
+                            controls
+                            src={festiveAudios[lang]}
+                            className="w-full"
+                          />
+                          <a
+                            href={festiveAudios[lang]}
+                            download={`festivo_${lang}.mp3`}
+                            className="text-sm text-blue-600 hover:underline mt-2 inline-block"
+                          >
+                            📥 Descargar audio
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {festiveLanguages.length > 1 && Object.keys(festiveAudios).length === festiveLanguages.length && (
+                    <button
+                      onClick={() => {
+                        const audioUrls = festiveLanguages
+                          .filter((lang) => festiveAudios[lang])
+                          .map((lang) => ({
+                            url: festiveAudios[lang],
+                            name: `festivo_${lang}`,
+                          }))
+
+                        if (audioUrls.length > 0) {
+                          setMode("merge")
+                          window.scrollTo({ top: 0, behavior: "smooth" })
+                        }
+                      }}
+                      className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition font-medium shadow-lg"
+                    >
+                      🔗 Unir todos los audios
+                    </button>
+                  )}
                 </div>
               )}
             </div>
