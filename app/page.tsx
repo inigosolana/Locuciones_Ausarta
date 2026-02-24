@@ -155,6 +155,7 @@ export default function Page() {
   const [festiveMessages, setFestiveMessages] = useState<Partial<Record<Language, string>>>({})
   const [festiveAudios, setFestiveAudios] = useState<Partial<Record<Language, string>>>({})
   const [generatingFestiveAudio, setGeneratingFestiveAudio] = useState<Language | null>(null)
+  
   const [festiveVoiceType, setFestiveVoiceType] = useState<"chico" | "chica">("chica")
   const [festiveFormat, setFestiveFormat] = useState<FormatId>("mp3")
 
@@ -202,7 +203,50 @@ export default function Page() {
     }
   }
 
- const generateFestiveAudio = async (lang: Language) => {
+  const generateFestiveMessages = async () => {
+    if (!festiveName.trim() || !festiveDate || !festiveCompany.trim() || festiveLanguages.length === 0) {
+      setFestiveError("Por favor completa todos los campos")
+      return
+    }
+
+    setFestiveLoading(true)
+    setFestiveError("")
+    setFestiveMessages({})
+    setFestiveAudios({})
+
+    try {
+      const res = await fetchWithTimeout(
+        "/api/festivos",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            festiveName,
+            date: festiveDate,
+            company: festiveCompany,
+            type: festiveType,
+            autonomyOrLocation: festiveAutonomy,
+            languages: festiveLanguages,
+          }),
+        },
+        30000
+      )
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Error generando mensajes")
+      }
+
+      const data = await res.json()
+      setFestiveMessages(data.messages)
+    } catch (error: any) {
+      setFestiveError(error.message || "Error desconocido")
+    } finally {
+      setFestiveLoading(false)
+    }
+  }
+
+  const generateFestiveAudio = async (lang: Language) => {
     const messageText = festiveMessages[lang]
     if (!messageText) {
       setFestiveError("No hay mensaje para este idioma")
@@ -237,49 +281,6 @@ export default function Page() {
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
         throw new Error(errData.error || "Error generando audio")
-      }
-
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      setFestiveAudios((prev) => ({ ...prev, [lang]: url }))
-    } catch (error: any) {
-      setFestiveError(error.message || "Error generando audio")
-    } finally {
-      setGeneratingFestiveAudio(null)
-    }
-  }
-
-  const generateFestiveAudio = async (lang: Language) => {
-    const messageText = festiveMessages[lang]
-    if (!messageText) {
-      setFestiveError("No hay mensaje para este idioma")
-      return
-    }
-
-    setGeneratingFestiveAudio(lang)
-    setFestiveError("")
-
-    try {
-      const voiceForLang = VOICES[lang][0].id
-
-      const res = await fetchWithTimeout(
-        "/api/tts",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: messageText,
-            voice: voiceForLang,
-            format: "mp3",
-            filename: `festivo_${lang}`,
-            speed: 1,
-          }),
-        },
-        55000
-      )
-
-      if (!res.ok) {
-        throw new Error("Error generando audio")
       }
 
       const blob = await res.blob()
@@ -1598,8 +1599,7 @@ export default function Page() {
                 </div>
               </div>
 
-
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Preferencia de Voz</label>
                   <select 
@@ -1623,7 +1623,6 @@ export default function Page() {
                   </select>
                 </div>
               </div>
-
 
               <button
                 onClick={generateFestiveMessages}
@@ -1680,7 +1679,7 @@ export default function Page() {
                           />
                           <a
                             href={festiveAudios[lang]}
-                            download={`festivo_${lang}.mp3`}
+                            download={`festivo_${lang}.${festiveFormat === "mp3" ? "mp3" : "wav"}`}
                             className="text-sm text-blue-600 hover:underline mt-2 inline-block"
                           >
                             📥 Descargar audio
