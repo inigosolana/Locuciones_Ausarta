@@ -1047,6 +1047,29 @@ export default function Page() {
                 />
               </div>
 
+              {/* MOSTRAR ARCHIVOS SELECCIONADOS (Importante para cuando los enviamos desde Festivos) */}
+              {mergeFiles.length > 0 && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-semibold text-blue-900 mb-2">
+                    ✅ Archivos listos para unir ({mergeFiles.length}):
+                  </p>
+                  <ul className="text-xs text-blue-800 space-y-1 ml-4 list-decimal">
+                    {mergeFiles.map((file, idx) => (
+                      <li key={idx}>{file.name}</li>
+                    ))}
+                  </ul>
+                  <button 
+                    onClick={() => {
+                      setMergeFiles([])
+                      if (mergeInputRef.current) mergeInputRef.current.value = ""
+                    }} 
+                    className="text-xs text-red-500 hover:underline mt-3"
+                  >
+                    🗑️ Limpiar lista
+                  </button>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Nombre del archivo combinado</label>
                 <input
@@ -1506,11 +1529,12 @@ export default function Page() {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="block text-sm font-semibold text-slate-700">Fecha</label>
-                    <label className="text-xs flex items-center gap-1 cursor-pointer">
+                    <label className="text-xs flex items-center gap-1 cursor-pointer text-slate-600">
                       <input 
                         type="checkbox" 
                         checked={isDateRange} 
                         onChange={(e) => setIsDateRange(e.target.checked)} 
+                        className="rounded"
                       />
                       Rango de fechas
                     </label>
@@ -1720,31 +1744,51 @@ export default function Page() {
                             download={`festivo_${lang}.${festiveFormat === "mp3" ? "mp3" : "wav"}`}
                             className="text-sm text-blue-600 hover:underline mt-2 inline-block"
                           >
-                            📥 Descargar audio
+                            📥 Descargar audio manual
                           </a>
                         </div>
                       )}
                     </div>
                   ))}
 
+                  {/* NUEVO BOTÓN PARA ENVIAR DIRECTO A UNIR */}
                   {festiveLanguages.length > 1 && Object.keys(festiveAudios).length === festiveLanguages.length && (
                     <button
-                      onClick={() => {
-                        const audioUrls = festiveLanguages
-                          .filter((lang) => festiveAudios[lang])
-                          .map((lang) => ({
-                            url: festiveAudios[lang],
-                            name: `festivo_${lang}`,
-                          }))
+                      onClick={async () => {
+                        const activeLangs = festiveLanguages.filter((lang) => festiveAudios[lang]);
+                        if (activeLangs.length < 2) {
+                           setFestiveError("Se necesitan al menos 2 audios generados para unirlos.");
+                           return;
+                        }
 
-                        if (audioUrls.length > 0) {
-                          setMode("merge")
-                          window.scrollTo({ top: 0, behavior: "smooth" })
+                        setFestiveLoading(true);
+                        try {
+                          const files: File[] = [];
+                          for (const lang of activeLangs) {
+                             const url = festiveAudios[lang]!;
+                             const res = await fetch(url);
+                             const blob = await res.blob();
+                             const ext = festiveFormat === "mp3" ? "mp3" : "wav";
+                             files.push(new File([blob], `festivo_${lang}.${ext}`, { type: blob.type }));
+                          }
+                          
+                          setMergeFiles(files);
+                          
+                          const safeName = festiveName.trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "") || "festivos";
+                          setMergedFileName(`${safeName}_combinados`);
+                          
+                          setMode("merge");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        } catch (e) {
+                          console.error("Error preparando archivos", e);
+                          setFestiveError("Error preparando los archivos para unir.");
+                        } finally {
+                          setFestiveLoading(false);
                         }
                       }}
-                      className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition font-medium shadow-lg"
+                      className="w-full bg-purple-600 text-white py-4 rounded-lg hover:bg-purple-700 transition font-bold shadow-lg mt-6"
                     >
-                      🔗 Unir todos los audios
+                      🔗 Enviar audios directamente a "Unir Audios"
                     </button>
                   )}
                 </div>
