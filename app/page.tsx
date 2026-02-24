@@ -152,10 +152,12 @@ export default function Page() {
   const [festiveLanguages, setFestiveLanguages] = useState<Language[]>(["castellano"])
   const [festiveLoading, setFestiveLoading] = useState(false)
   const [festiveError, setFestiveError] = useState("")
-  // Use Partial to allow the object to be empty initially
   const [festiveMessages, setFestiveMessages] = useState<Partial<Record<Language, string>>>({})
   const [festiveAudios, setFestiveAudios] = useState<Partial<Record<Language, string>>>({})
   const [generatingFestiveAudio, setGeneratingFestiveAudio] = useState<Language | null>(null)
+  
+  const [festiveVoiceType, setFestiveVoiceType] = useState<"chico" | "chica">("chica")
+  const [festiveFormat, setFestiveFormat] = useState<FormatId>("mp3")
 
   const handleLanguageChange = (newLanguage: Language) => {
     setLanguage(newLanguage)
@@ -255,7 +257,9 @@ export default function Page() {
     setFestiveError("")
 
     try {
-      const voiceForLang = VOICES[lang][0].id
+      const voiceForLang = VOICES[lang].find(v => 
+        v.id.toLowerCase().includes(festiveVoiceType)
+      )?.id || VOICES[lang][0].id
 
       const res = await fetchWithTimeout(
         "/api/tts",
@@ -265,8 +269,9 @@ export default function Page() {
           body: JSON.stringify({
             text: messageText,
             voice: voiceForLang,
-            format: "mp3",
+            format: festiveFormat,
             filename: `festivo_${lang}`,
+            language: lang,
             speed: 1,
           }),
         },
@@ -274,7 +279,8 @@ export default function Page() {
       )
 
       if (!res.ok) {
-        throw new Error("Error generando audio")
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || "Error generando audio")
       }
 
       const blob = await res.blob()
@@ -1593,6 +1599,31 @@ export default function Page() {
                 </div>
               </div>
 
+              <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Preferencia de Voz</label>
+                  <select 
+                    value={festiveVoiceType} 
+                    onChange={(e) => setFestiveVoiceType(e.target.value as "chico" | "chica")}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="chica">👩‍🦰 Voz Femenina</option>
+                    <option value="chico">👨‍🦱 Voz Masculina</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Formato de Salida</label>
+                  <select 
+                    value={festiveFormat} 
+                    onChange={(e) => setFestiveFormat(e.target.value as FormatId)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="mp3">MP3 (Calidad Estándar)</option>
+                    <option value="wav_yeastar">WAV YEASTAR (8kHz Centralita)</option>
+                  </select>
+                </div>
+              </div>
+
               <button
                 onClick={generateFestiveMessages}
                 disabled={festiveLoading || !festiveName.trim() || !festiveDate || !festiveCompany.trim()}
@@ -1648,7 +1679,7 @@ export default function Page() {
                           />
                           <a
                             href={festiveAudios[lang]}
-                            download={`festivo_${lang}.mp3`}
+                            download={`festivo_${lang}.${festiveFormat === "mp3" ? "mp3" : "wav"}`}
                             className="text-sm text-blue-600 hover:underline mt-2 inline-block"
                           >
                             📥 Descargar audio
