@@ -21,14 +21,14 @@ const VOICES: Record<
   chico: "3380a516-6acc-4389-97c8-68273b540dd3",
   ausarta: "44c5567b-1b68-4873-8231-4e7660f749ad",
 
-  euskera_chico: "727e60f9-789e-4dfb-9be1-4bc1f9f755c6",
-  euskera_chica: "74d84f24-85b5-4938-9fd1-d6c90eb5d7ab",
+  euskera_chico: "a62209c3-9f0a-4474-9b51-84b191593f49",
+  euskera_chica: "99543693-cf6e-4e1d-9259-2e5cc9a0f76b",
 
-  gallego_chico: "efe415b5-9952-4496-b305-63df975f2524",
-  gallego_chica: "563f1fa3-e2a3-4a2b-97ec-e4632cab4ae7",
+  gallego_chico: "4679c1e3-1fd5-45c0-a3a6-7f6e21ef82e2",
+  gallego_chica: "96eade6e-d863-4f9a-8b08-5d7b74d1643b",
 
-  ingles_chica: "sage",
-  ingles_chico: "echo",
+  ingles_chica: "62ae83ad-4f6a-430b-af41-a9bede9286ca",
+  ingles_chico: "0ad65e7f-006c-47cf-bd31-52279d487913",
 
   mexicano: "357a3291-faaa-4213-a586-2f18b736cec5",
 }
@@ -256,7 +256,9 @@ export async function POST(req: NextRequest) {
       voice === "euskera_chico" ||
       voice === "euskera_chica" ||
       voice === "gallego_chico" ||
-      voice === "gallego_chica"
+      voice === "gallego_chica" ||
+      voice === "ingles_chica" ||
+      voice === "ingles_chico"
 
     // Parsear texto para detectar pausas
     const segments = parseTextWithPauses(text)
