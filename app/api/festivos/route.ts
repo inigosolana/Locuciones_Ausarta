@@ -31,20 +31,22 @@ export async function POST(req: Request) {
     // Generar mensajes para cada idioma
     const messages: Record<Language, string> = {} as Record<Language, string>
 
-    for (const lang of languages) {
-      const languageName = {
+    for (const lang of languages as Language[]) {
+      const languageNames: Record<Language, string> = {
         castellano: "español",
         euskera: "euskera",
         gallego: "gallego",
         ingles: "inglés",
         mexicano: "español mexicano",
-      }[lang]
+      }
+      const languageName = languageNames[lang]
 
-      const typeText = {
+      const typeTexts: Record<string, string> = {
         nacional: "nacional",
         autonomico: `autonómico de ${autonomyOrLocation}`,
         local: `local de ${autonomyOrLocation}`,
-      }[type]
+      }
+      const typeText = typeTexts[type] || type
 
       const prompt = `Genera un mensaje de locución profesional y cordial para un día festivo en una empresa. 
 El mensaje debe ser breve (máximo 20 segundos de lectura), natural y profesional.
