@@ -1598,6 +1598,33 @@ export default function Page() {
                 </div>
               </div>
 
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Preferencia de Voz</label>
+                  <select 
+                    value={festiveVoiceType} 
+                    onChange={(e) => setFestiveVoiceType(e.target.value as "chico" | "chica")}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="chica">👩‍🦰 Voz Femenina</option>
+                    <option value="chico">👨‍🦱 Voz Masculina</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Formato de Salida</label>
+                  <select 
+                    value={festiveFormat} 
+                    onChange={(e) => setFestiveFormat(e.target.value as FormatId)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="mp3">MP3 (Calidad Estándar)</option>
+                    <option value="wav_yeastar">WAV YEASTAR (8kHz Centralita)</option>
+                  </select>
+                </div>
+              </div>
+
+
               <button
                 onClick={generateFestiveMessages}
                 disabled={festiveLoading || !festiveName.trim() || !festiveDate || !festiveCompany.trim()}
