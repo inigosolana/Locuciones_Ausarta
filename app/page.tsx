@@ -202,46 +202,50 @@ export default function Page() {
     }
   }
 
-  const generateFestiveMessages = async () => {
-    if (!festiveName.trim() || !festiveDate || !festiveCompany.trim() || festiveLanguages.length === 0) {
-      setFestiveError("Por favor completa todos los campos")
+ const generateFestiveAudio = async (lang: Language) => {
+    const messageText = festiveMessages[lang]
+    if (!messageText) {
+      setFestiveError("No hay mensaje para este idioma")
       return
     }
 
-    setFestiveLoading(true)
+    setGeneratingFestiveAudio(lang)
     setFestiveError("")
-    setFestiveMessages({})
-    setFestiveAudios({})
 
     try {
+      const voiceForLang = VOICES[lang].find(v => 
+        v.id.toLowerCase().includes(festiveVoiceType)
+      )?.id || VOICES[lang][0].id
+
       const res = await fetchWithTimeout(
-        "/api/festivos",
+        "/api/tts",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            festiveName,
-            date: festiveDate,
-            company: festiveCompany,
-            type: festiveType,
-            autonomyOrLocation: festiveAutonomy,
-            languages: festiveLanguages,
+            text: messageText,
+            voice: voiceForLang,
+            format: festiveFormat,
+            filename: `festivo_${lang}`,
+            language: lang,
+            speed: 1,
           }),
         },
-        30000
+        55000
       )
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Error generando mensajes")
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || "Error generando audio")
       }
 
-      const data = await res.json()
-      setFestiveMessages(data.messages)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      setFestiveAudios((prev) => ({ ...prev, [lang]: url }))
     } catch (error: any) {
-      setFestiveError(error.message || "Error desconocido")
+      setFestiveError(error.message || "Error generando audio")
     } finally {
-      setFestiveLoading(false)
+      setGeneratingFestiveAudio(null)
     }
   }
 
