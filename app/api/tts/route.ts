@@ -417,19 +417,17 @@ export async function POST(req: NextRequest) {
       const voiceId = VOICES[voice]
 
       // 🔹 Language: Asignar idioma según la voz
+      // 🔹 Language: Asignar idioma según la voz
       let language: string | undefined = undefined
-      const langParam = body.language // Idioma que enviamos ahora desde el front
+      const langParam = body.language 
       
-      if (langParam === "euskera" || voice.includes("euskera")) {
-        language = "eu"
-      } else if (langParam === "gallego" || voice.includes("gallego")) {
-        language = "gl"
-      } else if (langParam === "ingles" || voice.includes("ingles")) {
+      if (langParam === "ingles" || voice.includes("ingles")) {
         language = "en"
       } else {
-        language = "es" // Castellano y Mexicano
+        // Usamos fonética de "es" para Castellano, Euskera, Gallego y Mexicano.
+        // Cartesia da error 400 si se envía "eu" o "gl".
+        language = "es" 
       }
-
       // Helper para generar audio de un texto con Cartesia
       async function generateCartesiaAudio(inputText: string): Promise<Int16Array> {
         const body: any = {

@@ -146,6 +146,8 @@ export default function Page() {
   // ---------- FESTIVOS ----------
   const [festiveName, setFestiveName] = useState("")
   const [festiveDate, setFestiveDate] = useState("")
+  const [isDateRange, setIsDateRange] = useState(false)
+  const [festiveEndDate, setFestiveEndDate] = useState("")
   const [festiveCompany, setFestiveCompany] = useState("")
   const [festiveType, setFestiveType] = useState<"nacional" | "autonomico" | "local">("nacional")
   const [festiveAutonomy, setFestiveAutonomy] = useState("")
@@ -204,8 +206,13 @@ export default function Page() {
   }
 
   const generateFestiveMessages = async () => {
-    if (!festiveName.trim() || !festiveDate || !festiveCompany.trim() || festiveLanguages.length === 0) {
-      setFestiveError("Por favor completa todos los campos")
+    if (!festiveName.trim() || !festiveCompany.trim() || festiveLanguages.length === 0) {
+      setFestiveError("Por favor completa todos los campos (nombre, fechas, empresa).")
+      return
+    }
+
+    if (!festiveDate || (isDateRange && !festiveEndDate)) {
+      setFestiveError("Por favor completa las fechas correctamente.")
       return
     }
 
@@ -213,6 +220,8 @@ export default function Page() {
     setFestiveError("")
     setFestiveMessages({})
     setFestiveAudios({})
+
+    const dateStr = isDateRange && festiveEndDate ? `del ${festiveDate} al ${festiveEndDate}` : festiveDate;
 
     try {
       const res = await fetchWithTimeout(
@@ -222,7 +231,7 @@ export default function Page() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             festiveName,
-            date: festiveDate,
+            date: dateStr,
             company: festiveCompany,
             type: festiveType,
             autonomyOrLocation: festiveAutonomy,
@@ -1495,13 +1504,42 @@ export default function Page() {
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Fecha</label>
-                  <input
-                    type="date"
-                    value={festiveDate}
-                    onChange={(e) => setFestiveDate(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-semibold text-slate-700">Fecha</label>
+                    <label className="text-xs flex items-center gap-1 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={isDateRange} 
+                        onChange={(e) => setIsDateRange(e.target.checked)} 
+                      />
+                      Rango de fechas
+                    </label>
+                  </div>
+                  
+                  {isDateRange ? (
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="date"
+                        value={festiveDate}
+                        onChange={(e) => setFestiveDate(e.target.value)}
+                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-slate-500 font-medium">a</span>
+                      <input
+                        type="date"
+                        value={festiveEndDate}
+                        onChange={(e) => setFestiveEndDate(e.target.value)}
+                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="date"
+                      value={festiveDate}
+                      onChange={(e) => setFestiveDate(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Empresa</label>
@@ -1626,20 +1664,20 @@ export default function Page() {
 
               <button
                 onClick={generateFestiveMessages}
-                disabled={festiveLoading || !festiveName.trim() || !festiveDate || !festiveCompany.trim()}
+                disabled={festiveLoading || !festiveName.trim() || !festiveCompany.trim() || (!festiveDate)}
                 className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 disabled:opacity-50 shadow-lg"
               >
                 {festiveLoading ? "🤖 Generando mensajes..." : "✨ Generar Mensajes"}
               </button>
 
               {festiveError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4">
                   {festiveError}
                 </div>
               )}
 
               {Object.keys(festiveMessages).length > 0 && (
-                <div className="space-y-6 pt-6 border-t">
+                <div className="space-y-6 pt-6 border-t mt-6">
                   <h3 className="text-xl font-bold text-slate-900">Mensajes generados</h3>
                   {festiveLanguages.map((lang) => (
                     <div key={lang} className="border border-slate-200 rounded-lg p-4">
