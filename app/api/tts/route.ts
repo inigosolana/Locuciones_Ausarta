@@ -17,7 +17,7 @@ const VOICES: Record<
   | "mexicano",
   string
 > = {
-  chica: "cefcb124-080b-4655-b31f-932f3ee743de",
+  chica: "a2f12ebd-80df-4de7-83f3-809599135b1d",
   chico: "3380a516-6acc-4389-97c8-68273b540dd3",
   ausarta: "44c5567b-1b68-4873-8231-4e7660f749ad",
 
