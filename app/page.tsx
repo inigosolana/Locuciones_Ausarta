@@ -152,8 +152,9 @@ export default function Page() {
   const [festiveLanguages, setFestiveLanguages] = useState<Language[]>(["castellano"])
   const [festiveLoading, setFestiveLoading] = useState(false)
   const [festiveError, setFestiveError] = useState("")
-  const [festiveMessages, setFestiveMessages] = useState<Record<Language, string>>({})
-  const [festiveAudios, setFestiveAudios] = useState<Record<Language, string>>({})
+  // Use Partial to allow the object to be empty initially
+  const [festiveMessages, setFestiveMessages] = useState<Partial<Record<Language, string>>>({})
+  const [festiveAudios, setFestiveAudios] = useState<Partial<Record<Language, string>>>({})
   const [generatingFestiveAudio, setGeneratingFestiveAudio] = useState<Language | null>(null)
 
   const handleLanguageChange = (newLanguage: Language) => {
