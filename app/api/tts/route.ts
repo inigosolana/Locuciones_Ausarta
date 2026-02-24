@@ -416,10 +416,16 @@ export async function POST(req: NextRequest) {
 
       const voiceId = VOICES[voice]
 
-      // 🔹 Language: SOLO lo enviamos para voces en español/mexicano.
+      // 🔹 Language: Asignar idioma según la voz
       let language: string | undefined = undefined
       if (voice === "chica" || voice === "chico" || voice === "ausarta" || voice === "mexicano") {
         language = "es"
+      } else if (voice === "ingles_chica" || voice === "ingles_chico") {
+        language = "en"
+      } else if (voice === "euskera_chico" || voice === "euskera_chica") {
+        language = "eu"
+      } else if (voice === "gallego_chico" || voice === "gallego_chica") {
+        language = "gl"
       }
 
       // Helper para generar audio de un texto con Cartesia
