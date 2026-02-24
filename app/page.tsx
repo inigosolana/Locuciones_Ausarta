@@ -138,11 +138,53 @@ export default function Page() {
 
   const [speed, setSpeed] = useState<number>(1)
 
+  // ---------- TRANSLATION ----------
+  const [sourceLanguage, setSourceLanguage] = useState<Language>("castellano")
+  const [translating, setTranslating] = useState(false)
+  const [translationError, setTranslationError] = useState("")
+
   const handleLanguageChange = (newLanguage: Language) => {
     setLanguage(newLanguage)
     setVoice(VOICES[newLanguage][0].id)
     setAudioURL("")
     if (audioRef.current) audioRef.current.src = ""
+  }
+
+  const translateText = async (targetLang: Language) => {
+    if (!text.trim()) {
+      setTranslationError("El texto está vacío")
+      return
+    }
+
+    setTranslating(true)
+    setTranslationError("")
+
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: text,
+          sourceLanguage: sourceLanguage,
+          targetLanguage: targetLang,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Error en la traducción")
+      }
+
+      const data = await res.json()
+      setText(data.translatedText)
+      setLanguage(targetLang)
+      setVoice(VOICES[targetLang][0].id)
+      setSourceLanguage(targetLang)
+    } catch (error: any) {
+      setTranslationError(error.message || "Error desconocido")
+    } finally {
+      setTranslating(false)
+    }
   }
 
   const handleFormatChange = (newFormat: FormatId) => {
@@ -538,6 +580,33 @@ export default function Page() {
               <p className="text-xs text-slate-500 mt-2">
                 <b>Pausas:</b> Usa <code className="bg-slate-100 px-1 rounded">[pausa:X.Xs]</code> para insertar pausas. Ejemplo: <code className="bg-slate-100 px-1 rounded">Hola [pausa:2.5s] mundo</code>.
               </p>
+            </div>
+
+            <div className="mb-6 space-y-3">
+              <label className="text-sm font-semibold text-slate-900">Traducir a otro idioma</label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {Object.keys(VOICES).map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => translateText(lang as Language)}
+                    disabled={translating}
+                    className="px-3 py-2 text-sm bg-slate-100 hover:bg-slate-200 disabled:bg-slate-300 text-slate-900 rounded-lg transition font-medium"
+                  >
+                    {lang === "castellano"
+                      ? "🇪🇸 Castellano"
+                      : lang === "euskera"
+                        ? "🇪🇺 Euskera"
+                        : lang === "gallego"
+                          ? "🇬🇦 Gallego"
+                          : lang === "ingles"
+                            ? "🇬🇧 Inglés"
+                            : "🇲🇽 Mexicano"}
+                  </button>
+                ))}
+              </div>
+              {translationError && (
+                <p className="text-sm text-red-600">{translationError}</p>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
