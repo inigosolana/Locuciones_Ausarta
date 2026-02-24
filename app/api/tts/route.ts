@@ -246,7 +246,7 @@ export async function POST(req: NextRequest) {
 
     const fmt: FormatId = format === "wav_yeastar" ? "wav_yeastar" : "mp3"
 
-    const isOpenAI = voice === "ingles_chica" || voice === "ingles_chico"
+    const isOpenAI = false // All voices now use Cartesia
 
     const isCartesia =
       voice === "chica" ||
