@@ -157,7 +157,8 @@ export default function Page() {
   const [festiveMessages, setFestiveMessages] = useState<Partial<Record<Language, string>>>({})
   const [festiveAudios, setFestiveAudios] = useState<Partial<Record<Language, string>>>({})
   const [generatingFestiveAudio, setGeneratingFestiveAudio] = useState<Language | null>(null)
-  
+  const [festiveAudioFilenames, setFestiveAudioFilenames] = useState<Partial<Record<Language, string>>>({})
+
   const [festiveVoiceType, setFestiveVoiceType] = useState<"chico" | "chica">("chica")
   const [festiveFormat, setFestiveFormat] = useState<FormatId>("mp3")
 
@@ -295,6 +296,10 @@ export default function Page() {
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       setFestiveAudios((prev) => ({ ...prev, [lang]: url }))
+      // Inicializar nombre del archivo si no existe
+      if (!festiveAudioFilenames[lang]) {
+        setFestiveAudioFilenames((prev) => ({ ...prev, [lang]: `festivo_${lang}` }))
+      }
     } catch (error: any) {
       setFestiveError(error.message || "Error generando audio")
     } finally {
@@ -1733,19 +1738,28 @@ export default function Page() {
                       />
 
                       {festiveAudios[lang] && (
-                        <div className="mt-3">
+                        <div className="mt-3 space-y-3">
                           <audio
                             controls
                             src={festiveAudios[lang]}
                             className="w-full"
                           />
-                          <a
-                            href={festiveAudios[lang]}
-                            download={`festivo_${lang}.${festiveFormat === "mp3" ? "mp3" : "wav"}`}
-                            className="text-sm text-blue-600 hover:underline mt-2 inline-block"
-                          >
-                            📥 Descargar audio manual
-                          </a>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={festiveAudioFilenames[lang] || `festivo_${lang}`}
+                              onChange={(e) => setFestiveAudioFilenames((prev) => ({ ...prev, [lang]: e.target.value }))}
+                              placeholder="Nombre del archivo"
+                              className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <a
+                              href={festiveAudios[lang]}
+                              download={`${festiveAudioFilenames[lang] || `festivo_${lang}`}.${festiveFormat === "mp3" ? "mp3" : "wav"}`}
+                              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
+                            >
+                              📥 Descargar
+                            </a>
+                          </div>
                         </div>
                       )}
                     </div>
