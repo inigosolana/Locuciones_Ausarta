@@ -277,7 +277,7 @@ export default function Page() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            text: messageText,
+            text: messageText.toLowerCase(),
             voice: voiceForLang,
             format: festiveFormat,
             filename: `festivo_${lang}`,
@@ -324,7 +324,7 @@ export default function Page() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            text,
+            text: text.toLowerCase(),
             voice,
             format,
             filename,
